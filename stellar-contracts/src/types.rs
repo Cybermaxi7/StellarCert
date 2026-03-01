@@ -67,6 +67,13 @@ pub enum RequestStatus {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum OptionalRequestStatus {
+    None,
+    Some(RequestStatus),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingRequest {
     pub id: String,
     pub issuer: Address,
@@ -85,7 +92,7 @@ pub struct PendingRequest {
 pub struct SignatureResult {
     pub success: bool,
     pub message: String,
-    pub final_status: Option<RequestStatus>,
+    pub final_status: OptionalRequestStatus,
 }
 
 #[contracttype]

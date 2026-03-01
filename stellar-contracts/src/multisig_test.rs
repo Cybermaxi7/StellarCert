@@ -79,12 +79,12 @@ fn test_approve_request_success() {
     // First approval
     let result = client.approve_request(&request_id, &signer1);
     assert!(result.success);
-    assert_eq!(result.final_status, Some(RequestStatus::Pending));
+    assert_eq!(result.final_status, OptionalRequestStatus::Some(RequestStatus::Pending));
 
     // Second approval - should reach threshold and become approved
     let result = client.approve_request(&request_id, &signer2);
     assert!(result.success);
-    assert_eq!(result.final_status, Some(RequestStatus::Approved));
+    assert_eq!(result.final_status, OptionalRequestStatus::Some(RequestStatus::Approved));
 
     // Check the request status
     let request = client.get_pending_request(&request_id);
@@ -119,17 +119,17 @@ fn test_reject_request() {
     // Reject by one signer
     let result = client.reject_request(&request_id, &signer1, &None);
     assert!(result.success);
-    assert_eq!(result.final_status, Some(RequestStatus::Pending));
+    assert_eq!(result.final_status, OptionalRequestStatus::Some(RequestStatus::Pending));
 
     // Approve by another signer
     let result = client.approve_request(&request_id, &signer2);
     assert!(result.success);
-    assert_eq!(result.final_status, Some(RequestStatus::Pending));
+    assert_eq!(result.final_status, OptionalRequestStatus::Some(RequestStatus::Pending));
 
     // Approve by third signer - should succeed despite rejection
     let result = client.approve_request(&request_id, &signer3);
     assert!(result.success);
-    assert_eq!(result.final_status, Some(RequestStatus::Approved));
+    assert_eq!(result.final_status, OptionalRequestStatus::Some(RequestStatus::Approved));
 
     // Check the request status
     let request = client.get_pending_request(&request_id);
@@ -165,12 +165,12 @@ fn test_reject_request_impossible_approval() {
     // Reject by one signer
     let result = client.reject_request(&request_id, &signer1, &None);
     assert!(result.success);
-    assert_eq!(result.final_status, Some(RequestStatus::Pending));
+    assert_eq!(result.final_status, OptionalRequestStatus::Some(RequestStatus::Pending));
 
     // Reject by second signer - now impossible to reach threshold of 3
     let result = client.reject_request(&request_id, &signer2, &None);
     assert!(result.success);
-    assert_eq!(result.final_status, Some(RequestStatus::Rejected));
+    assert_eq!(result.final_status, OptionalRequestStatus::Some(RequestStatus::Rejected));
 
     // Check the request status
     let request = client.get_pending_request(&request_id);

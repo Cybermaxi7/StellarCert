@@ -117,6 +117,7 @@ impl CertificateContract {
         admin: Address,
     ) {
         admin.require_auth();
+        #[allow(clippy::unnecessary_cast)]
         if threshold == 0 || signers.is_empty() || threshold > signers.len() as u32 || max_signers < threshold {
             panic!("Invalid multisig parameters");
         }
@@ -150,6 +151,8 @@ impl CertificateContract {
             config.max_signers = max_signers;
         }
 
+        #[allow(clippy::unnecessary_cast)]
+        #[allow(clippy::unnecessary_cast)]
         if config.threshold == 0 || config.signers.is_empty() || config.threshold > config.signers.len() as u32 || config.max_signers < config.threshold {
             panic!("Invalid updated multisig parameters");
         }
@@ -199,11 +202,11 @@ impl CertificateContract {
         if env.ledger().timestamp() > request.expires_at {
             request.status = RequestStatus::Expired;
             env.storage().instance().set(&DataKey::PendingRequest(request_id), &request);
-            return SignatureResult { success: false, message: String::from_str(&env, "Expired"), final_status: Some(RequestStatus::Expired) };
+            return SignatureResult { success: false, message: String::from_str(&env, "Expired"), final_status: OptionalRequestStatus::Some(RequestStatus::Expired) };
         }
 
         if request.status != RequestStatus::Pending {
-            return SignatureResult { success: false, message: String::from_str(&env, "Not pending"), final_status: Some(request.status) };
+            return SignatureResult { success: false, message: String::from_str(&env, "Not pending"), final_status: OptionalRequestStatus::Some(request.status) };
         }
 
         let config: MultisigConfig = env.storage().instance().get(&DataKey::MultisigConfig(request.issuer.clone())).expect("Config not found");
@@ -220,7 +223,7 @@ impl CertificateContract {
         }
 
         env.storage().instance().set(&DataKey::PendingRequest(request_id), &request);
-        SignatureResult { success: true, message: String::from_str(&env, "Approved"), final_status: Some(request.status) }
+        SignatureResult { success: true, message: String::from_str(&env, "Approved"), final_status: OptionalRequestStatus::Some(request.status) }
     }
 
     pub fn reject_request(env: Env, request_id: String, rejector: Address, _reason: Option<String>) -> SignatureResult {
@@ -228,7 +231,7 @@ impl CertificateContract {
         let mut request: PendingRequest = env.storage().instance().get(&DataKey::PendingRequest(request_id.clone())).expect("Request not found");
         
         if request.status != RequestStatus::Pending {
-            return SignatureResult { success: false, message: String::from_str(&env, "Not pending"), final_status: Some(request.status) };
+            return SignatureResult { success: false, message: String::from_str(&env, "Not pending"), final_status: OptionalRequestStatus::Some(request.status) };
         }
 
         if !request.rejections.contains(&rejector) {
@@ -239,7 +242,7 @@ impl CertificateContract {
         // For simplicity, we just track it.
         
         env.storage().instance().set(&DataKey::PendingRequest(request_id), &request);
-        SignatureResult { success: true, message: String::from_str(&env, "Rejected"), final_status: Some(request.status) }
+        SignatureResult { success: true, message: String::from_str(&env, "Rejected"), final_status: OptionalRequestStatus::Some(request.status) }
     }
 
     pub fn issue_approved_certificate(env: Env, request_id: String) -> bool {

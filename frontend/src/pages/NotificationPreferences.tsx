@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, CheckCircle, AlertTriangle, Info, Save } from 'lucide-react';
+import { tokenStorage } from '@/api';
 
 interface Preferences {
     inAppEnabled: boolean;
@@ -19,7 +20,7 @@ export default function NotificationPreferences() {
 
     const fetchPreferences = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = tokenStorage.getAccessToken();
             const res = await fetch('http://localhost:3001/notifications/preferences', {
                 headers: { Authorization: `Bearer ${token}` },
             });

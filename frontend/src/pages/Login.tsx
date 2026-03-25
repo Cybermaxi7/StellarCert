@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogIn, UserPlus, Shield, Eye, EyeOff } from "lucide-react";
 import { authApi, UserRole } from "../api";
+import { tokenStorage } from "../api";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -50,8 +51,9 @@ const Login = () => {
       });
 
       if (res.accessToken) {
-        localStorage.setItem("accessToken", res.accessToken);
-        localStorage.setItem("user", JSON.stringify(res.user));
+        tokenStorage.setAccessToken(res.accessToken);
+        tokenStorage.setRefreshToken(res.refreshToken);
+
 
         // Redirect to dashboard or home page
         navigate("/");

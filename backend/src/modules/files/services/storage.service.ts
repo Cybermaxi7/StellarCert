@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -11,13 +11,16 @@ import { v4 as uuidv4 } from 'uuid';
 import { extname } from 'path';
 
 @Injectable()
-export class StorageService {
+export class StorageService implements OnModuleInit {
   private readonly logger = new Logger(StorageService.name);
-  private readonly s3Client: S3Client;
+  private readonly s3Client: S3Client | null = null;
   private readonly bucket: string;
+  private readonly isStorageRequired: boolean;
 
   constructor(private readonly configService: ConfigService) {
     this.bucket = this.configService.get<string>('STORAGE_BUCKET') ?? '';
+    this.isStorageRequired =
+      this.configService.get<string>('STORAGE_REQUIRED') !== 'false';
 
     const region = this.configService.get<string>('STORAGE_REGION');
     const endpoint = this.configService.get<string>('STORAGE_ENDPOINT');
@@ -35,10 +38,34 @@ export class StorageService {
         },
         forcePathStyle: true, // Needed for MinIO
       });
-    } else {
-      this.logger.warn(
-        'Storage configuration missing. StorageService will not function correctly.',
-      );
+      this.logger.log('S3 storage client initialized successfully');
+    }
+  }
+
+  onModuleInit() {
+    if (!this.s3Client) {
+      const missingConfig: string[] = [];
+      if (!this.configService.get<string>('STORAGE_ACCESS_KEY')) {
+        missingConfig.push('STORAGE_ACCESS_KEY');
+      }
+      if (!this.configService.get<string>('STORAGE_SECRET_KEY')) {
+        missingConfig.push('STORAGE_SECRET_KEY');
+      }
+      if (!this.bucket) {
+        missingConfig.push('STORAGE_BUCKET');
+      }
+
+      if (this.isStorageRequired) {
+        throw new Error(
+          `StorageService requires S3 configuration but the following environment variables are missing: ${missingConfig.join(', ')}. ` +
+            `Either provide the required storage configuration or set STORAGE_REQUIRED=false to disable storage functionality.`,
+        );
+      } else {
+        this.logger.warn(
+          'Storage configuration is incomplete. StorageService will not function correctly. ' +
+            `Missing: ${missingConfig.join(', ')}`,
+        );
+      }
     }
   }
 

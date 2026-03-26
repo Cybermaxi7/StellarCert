@@ -125,6 +125,10 @@ class EnvironmentVariables {
   STORAGE_BUCKET?: string;
 
   @IsOptional()
+  @IsBoolean()
+  STORAGE_REQUIRED?: boolean;
+
+  @IsOptional()
   @IsNumber()
   AUDIT_RETENTION_DAYS?: number;
 }
@@ -166,6 +170,7 @@ export function validateEnv(): EnvironmentVariables {
       STORAGE_ACCESS_KEY: process.env.STORAGE_ACCESS_KEY,
       STORAGE_SECRET_KEY: process.env.STORAGE_SECRET_KEY,
       STORAGE_BUCKET: process.env.STORAGE_BUCKET,
+      STORAGE_REQUIRED: process.env.STORAGE_REQUIRED !== 'false',
       AUDIT_RETENTION_DAYS: process.env.AUDIT_RETENTION_DAYS
         ? parseInt(process.env.AUDIT_RETENTION_DAYS, 10)
         : undefined,

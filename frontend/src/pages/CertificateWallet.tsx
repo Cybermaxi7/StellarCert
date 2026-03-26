@@ -6,7 +6,7 @@ const CertificateWallet = () => {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ merged states
+  // ✅ QR states
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
   const [selectedQR, setSelectedQR] = useState<string | null>(null);
   const [loadingQR, setLoadingQR] = useState<Record<string, boolean>>({});
@@ -38,7 +38,7 @@ const CertificateWallet = () => {
     fetchCertificates();
   }, []);
 
-  // ✅ QR LOGIC
+  // ✅ QR CODE LOGIC
   const fetchQRCode = async (certificateId: string) => {
     if (qrCodes[certificateId]) return qrCodes[certificateId];
 
@@ -61,7 +61,7 @@ const CertificateWallet = () => {
     if (qrCode) setSelectedQR(qrCode);
   };
 
-  // ✅ PDF LOGIC
+  // ✅ PDF VIEW/DOWNLOAD LOGIC
   const handlePdfAction = async (cert: Certificate, action: 'view' | 'download') => {
     setError(null);
     setActionLoadingId(cert.id);
@@ -110,7 +110,7 @@ const CertificateWallet = () => {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3 text-red-700">
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
           <AlertCircle className="w-5 h-5 mt-0.5" />
           <p>{error}</p>
         </div>

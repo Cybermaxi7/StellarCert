@@ -8,6 +8,7 @@ import {
   xdr,
   Address,
   Account,
+  scValToNative,
 } from '@stellar/stellar-sdk';
 import { StellarService } from '../stellar/services/stellar.service';
 
@@ -585,11 +586,7 @@ export class MultisigService {
 
       if (rpc.Api.isSimulationSuccess(response)) {
         if (response.result) {
-          return {
-            threshold: 2,
-            signers: [issuer],
-            max_signers: 5,
-          };
+          return this.parseMultisigConfig(response.result.retval);
         }
       }
 
@@ -630,18 +627,7 @@ export class MultisigService {
 
       if (rpc.Api.isSimulationSuccess(response)) {
         if (response.result) {
-          return {
-            id: requestId,
-            issuer: '',
-            recipient: '',
-            metadata: '',
-            proposer: '',
-            approvals: [],
-            rejections: [],
-            created_at: Date.now(),
-            expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000,
-            status: RequestStatus.Pending,
-          };
+          return this.parsePendingRequest(response.result.retval);
         }
       }
 
@@ -743,13 +729,7 @@ export class MultisigService {
 
       if (rpc.Api.isSimulationSuccess(response)) {
         if (response.result) {
-          return {
-            data: [],
-            total: 0,
-            page: pagination.page,
-            limit: pagination.limit,
-            has_next: false,
-          };
+          return this.parsePaginatedResult(response.result.retval);
         }
       }
 
@@ -809,13 +789,7 @@ export class MultisigService {
 
       if (rpc.Api.isSimulationSuccess(response)) {
         if (response.result) {
-          return {
-            data: [],
-            total: 0,
-            page: pagination.page,
-            limit: pagination.limit,
-            has_next: false,
-          };
+          return this.parsePaginatedResult(response.result.retval);
         }
       }
 
@@ -828,5 +802,53 @@ export class MultisigService {
       );
       throw error;
     }
+  }
+
+  private mapNativeToPendingRequest(r: Record<string, unknown>): PendingRequest {
+    return {
+      id: Buffer.isBuffer(r['id'])
+        ? (r['id'] as Buffer).toString()
+        : String(r['id']),
+      issuer: r['issuer'] as string,
+      recipient: r['recipient'] as string,
+      metadata: Buffer.isBuffer(r['metadata'])
+        ? (r['metadata'] as Buffer).toString()
+        : String(r['metadata']),
+      proposer: r['proposer'] as string,
+      approvals: (r['approvals'] as string[]) ?? [],
+      rejections: (r['rejections'] as string[]) ?? [],
+      created_at: Number(r['created_at']),
+      expires_at: Number(r['expires_at']),
+      status: Number(r['status']) as RequestStatus,
+    };
+  }
+
+  private parseMultisigConfig(retval: xdr.ScVal): MultisigConfig {
+    const native = scValToNative(retval) as Record<string, unknown>;
+    return {
+      threshold: Number(native['threshold']),
+      signers: (native['signers'] as string[]) ?? [],
+      max_signers: Number(native['max_signers']),
+    };
+  }
+
+  private parsePendingRequest(retval: xdr.ScVal): PendingRequest {
+    return this.mapNativeToPendingRequest(
+      scValToNative(retval) as Record<string, unknown>,
+    );
+  }
+
+  private parsePaginatedResult(retval: xdr.ScVal): PaginatedResult {
+    const native = scValToNative(retval) as Record<string, unknown>;
+    const data = ((native['data'] as unknown[]) ?? []).map((item) =>
+      this.mapNativeToPendingRequest(item as Record<string, unknown>),
+    );
+    return {
+      data,
+      total: Number(native['total']),
+      page: Number(native['page']),
+      limit: Number(native['limit']),
+      has_next: Boolean(native['has_next']),
+    };
   }
 }

@@ -9,6 +9,7 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateCertificateDto {
+  @IsOptional()
   @IsUUID()
   issuerId: string;
 

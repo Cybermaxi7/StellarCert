@@ -1,6 +1,7 @@
 import {
   Injectable,
   ConflictException,
+  ForbiddenException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -253,8 +254,19 @@ export class CertificateService {
     return this.certificateRepository.save(certificate);
   }
 
-  async revoke(id: string, reason?: string): Promise<Certificate> {
+  async revoke(
+    id: string,
+    reason?: string,
+    issuerId?: string,
+    userRole?: string,
+  ): Promise<Certificate> {
     const certificate = await this.findOne(id);
+
+    if (userRole !== 'admin' && issuerId && certificate.issuerId !== issuerId) {
+      throw new ForbiddenException(
+        'You are not authorized to revoke this certificate',
+      );
+    }
 
     certificate.status = 'revoked';
     if (reason) {
@@ -355,6 +367,8 @@ export class CertificateService {
   async bulkRevoke(
     certificateIds: string[],
     reason?: string,
+    issuerId?: string,
+    userRole?: string,
   ): Promise<{
     revoked: Certificate[];
     failed: { id: string; error: string }[];
@@ -364,7 +378,7 @@ export class CertificateService {
 
     for (const id of certificateIds) {
       try {
-        const certificate = await this.revoke(id, reason);
+        const certificate = await this.revoke(id, reason, issuerId, userRole);
         revoked.push(certificate);
       } catch (error) {
         failed.push({

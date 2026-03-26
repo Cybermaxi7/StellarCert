@@ -22,6 +22,7 @@ import { JwtAuthGuard } from 'src/common';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateCertificateDto } from './dto/create-certificate.dto';
 import { CertificateQrResponseDto } from './dto/certificate-qr-response.dto';
 
@@ -75,7 +76,11 @@ export class CertificateController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ISSUER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Create new certificate' })
-  async create(@Body() dto: CreateCertificateDto) {
+  async create(
+    @Body() dto: CreateCertificateDto,
+    @CurrentUser('sub') issuerId: string,
+  ) {
+    dto.issuerId = issuerId;
     return this.certificateService.create(dto);
   }
 
@@ -83,8 +88,13 @@ export class CertificateController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ISSUER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Revoke certificate' })
-  async revoke(@Param('id') id: string, @Body('reason') reason?: string) {
-    return this.certificateService.revoke(id, reason);
+  async revoke(
+    @Param('id') id: string,
+    @Body('reason') reason?: string,
+    @CurrentUser('sub') issuerId?: string,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.certificateService.revoke(id, reason, issuerId, userRole);
   }
 
   @Patch(':id/freeze')
@@ -110,8 +120,15 @@ export class CertificateController {
   async bulkRevoke(
     @Body('certificateIds') certificateIds: string[],
     @Body('reason') reason?: string,
+    @CurrentUser('sub') issuerId?: string,
+    @CurrentUser('role') userRole?: string,
   ) {
-    return this.certificateService.bulkRevoke(certificateIds, reason);
+    return this.certificateService.bulkRevoke(
+      certificateIds,
+      reason,
+      issuerId,
+      userRole,
+    );
   }
 
   @Get('export')

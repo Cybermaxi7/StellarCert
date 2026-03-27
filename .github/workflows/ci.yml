@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd ${{ matrix.component }}
-          npm ci
+          npm ci --include=dev
 
       - name: Run linting
         run: |
@@ -67,7 +67,7 @@ jobs:
         run: |
           if [ "${{ matrix.component }}" == "frontend" ] || [ "${{ matrix.component }}" == "backend" ]; then
             cd ${{ matrix.component }}
-            npm ci
+            npm ci --include=dev
           fi
 
       - name: Build frontend
@@ -218,9 +218,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm ci
-          cd frontend && npm ci
-          cd ../backend && npm ci
+          npm ci --include=dev
+          cd frontend && npm ci --include=dev
+          cd ../backend && npm ci --include=dev
 
       - name: Build all components
         run: |

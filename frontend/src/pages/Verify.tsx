@@ -1,4 +1,6 @@
-export default function Verify(): JSX.Element {
+import React from 'react';
+
+export default function Verify(): React.JSX.Element {
   return (
     <section className="space-y-8">
       <div>

@@ -191,6 +191,17 @@ export interface ProfileUpdateData {
   [key: string]: unknown;
 }
 
+// Password reset/request types
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export interface DailyVerificationStats {
   count: number;
 }

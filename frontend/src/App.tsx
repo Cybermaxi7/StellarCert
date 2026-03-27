@@ -11,6 +11,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const IssueCertificate = lazy(() => import('./pages/IssueCertificate'));
 const VerifyCertificate = lazy(() => import('./pages/VerifyCertificate'));
 const CertificateWallet = lazy(() => import('./pages/CertificateWallet'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Login = lazy(() => import('./pages/Login'));
 const RevokeCertificatePage = lazy(() => import('./pages/RevokeCertificate'));
 const IssuerProfile = lazy(() => import('./pages/IssuerProfile'));
@@ -37,6 +38,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/verify" element={<VerifyCertificate />} />
               <Route path="/profile" element={<IssuerProfile />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/preferences" element={<NotificationPreferences />} />
 
               {/* Protected Routes */}

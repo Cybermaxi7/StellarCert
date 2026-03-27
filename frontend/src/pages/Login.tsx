@@ -10,6 +10,10 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const [formData, setFormData] = useState<{
     email: string;
@@ -233,6 +237,57 @@ const Login = () => {
           </button>
         </form>
 
+        {/* Forgot password flow */}
+        {isLogin && (
+          <div className="mt-4 text-center">
+            {!showForgot ? (
+              <button
+                onClick={() => setShowForgot(true)}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Forgot your password?
+              </button>
+            ) : (
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 mb-2">Enter your account email to receive password reset instructions.</p>
+                {forgotSuccess ? (
+                  <div className="text-sm text-green-600">{forgotSuccess}</div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="flex-1 px-3 py-2 border rounded-md"
+                    />
+                    <button
+                      onClick={async () => {
+                        setForgotLoading(true);
+                        setError(null);
+                        try {
+                          await authApi.forgotPassword({ email: forgotEmail });
+                          setForgotSuccess('If the email exists, a reset link has been sent.');
+                        } catch (err: unknown) {
+                          setError(err instanceof Error ? err.message : 'Failed to request password reset');
+                        } finally {
+                          setForgotLoading(false);
+                        }
+                      }}
+                      disabled={forgotLoading}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-md"
+                    >
+                      {forgotLoading ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
+                )}
+                <div className="mt-2">
+                  <button onClick={() => setShowForgot(false)} className="text-xs text-gray-500 hover:underline">Cancel</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {/* Toggle */}
         <div className="mt-6 text-center">
           <button

@@ -659,6 +659,34 @@ export const registerApi = async (
 export const authApi = {
   login: loginApi,
   register: registerApi,
+  forgotPassword: async (data: import('./types').ForgotPasswordRequest): Promise<{ message: string }> => {
+    if (USE_DUMMY_DATA) {
+      await simulateDelay();
+      return { message: 'If the email exists, a password reset link has been sent' };
+    }
+    try {
+      return apiClient('/users/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (err) {
+      return handleError(err, 'forgotPassword');
+    }
+  },
+  resetPassword: async (data: import('./types').ResetPasswordRequest): Promise<{ message: string }> => {
+    if (USE_DUMMY_DATA) {
+      await simulateDelay();
+      return { message: 'Password reset successfully' };
+    }
+    try {
+      return apiClient('/users/reset-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch (err) {
+      return handleError(err, 'resetPassword');
+    }
+  },
   logout: async (): Promise<void> => {
     try {
       if (!USE_DUMMY_DATA) {

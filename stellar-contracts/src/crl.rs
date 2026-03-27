@@ -97,7 +97,9 @@ impl CRLContract {
             revoked_by: issuer,
         };
 
-        env.storage().instance().set(&revocation_key, &revocation_info);
+        env.storage()
+            .instance()
+            .set(&revocation_key, &revocation_info);
 
         let mut revoked_certificates = Self::get_revoked_certificate_ids(&env);
         revoked_certificates.push_back(certificate_id);

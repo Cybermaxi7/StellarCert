@@ -31,6 +31,8 @@ pub enum DataKey {
     MultisigConfig(Address),
     IssuerAdmin(Address),
     PendingRequest(String),
+    IssuerRequestIds(Address),
+    SignerRequestIds(Address),
 }
 
 #[contracttype]

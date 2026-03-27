@@ -1,7 +1,5 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, String, Vec};
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Vec};
-use crate::storage::{DataKey, CoreDataKey};
 
 mod types;
 pub use types::*;
@@ -20,6 +18,8 @@ pub use admin_multisig::*;
 
 #[cfg(test)]
 mod admin_multisig_test;
+#[cfg(test)]
+mod multisig_test;
 
 #[contract]
 pub struct CertificateContract;
@@ -205,7 +205,6 @@ impl CertificateContract {
             .set(&DataKey::Certificate(id.clone()), &cert);
     }
 
-
     /// Verify if a certificate is valid (active and not expired)
     pub fn is_valid(env: Env, id: String) -> bool {
         if let Some(cert) = env
@@ -311,13 +310,11 @@ impl CertificateContract {
         metadata: String,
         expiration_days: u32,
     ) -> PendingRequest {
-        if !env
+        let config: MultisigConfig = env
             .storage()
             .instance()
-            .has(&DataKey::MultisigConfig(issuer.clone()))
-        {
-            panic!("Issuer does not have multisig configuration");
-        }
+            .get(&DataKey::MultisigConfig(issuer.clone()))
+            .expect("Issuer does not have multisig configuration");
         if env
             .storage()
             .instance()
@@ -335,13 +332,20 @@ impl CertificateContract {
             approvals: Vec::new(&env),
             rejections: Vec::new(&env),
             created_at: env.ledger().timestamp(),
-            expires_at: env.ledger().timestamp() + expiration_days as u64,
+            expires_at: env.ledger().timestamp() + (expiration_days as u64 * 24 * 60 * 60),
             status: RequestStatus::Pending,
         };
 
         env.storage()
             .instance()
-            .set(&DataKey::PendingRequest(request_id), &request);
+            .set(&DataKey::PendingRequest(request_id.clone()), &request);
+
+        Self::append_request_id(&env, DataKey::IssuerRequestIds(issuer), request_id.clone());
+
+        for signer in config.signers.iter() {
+            Self::append_request_id(&env, DataKey::SignerRequestIds(signer), request_id.clone());
+        }
+
         request
     }
 
@@ -381,10 +385,7 @@ impl CertificateContract {
         if !config.signers.contains(&approver) {
             return SignatureResult {
                 success: false,
-                message: String::from_str(
-                    &env,
-                    "Approver is not an authorized signer",
-                ),
+                message: String::from_str(&env, "Approver is not an authorized signer"),
                 final_status: OptionalRequestStatus::Some(request.status),
             };
         }
@@ -434,12 +435,23 @@ impl CertificateContract {
             };
         }
 
+        let config: MultisigConfig = env
+            .storage()
+            .instance()
+            .get(&DataKey::MultisigConfig(request.issuer.clone()))
+            .expect("Config not found");
+
         if !request.rejections.contains(&rejector) {
             request.rejections.push_back(rejector);
         }
 
-        // Simplify rejection: one rejection doesn't necessarily fail the whole thing unless threshold can't be met
-        // For simplicity, we just track it.
+        let remaining_eligible_approvers = config
+            .signers
+            .len()
+            .saturating_sub(request.rejections.len());
+        if remaining_eligible_approvers < config.threshold {
+            request.status = RequestStatus::Rejected;
+        }
 
         env.storage()
             .instance()
@@ -503,32 +515,26 @@ impl CertificateContract {
 
     pub fn get_pending_requests_for_issuer(
         env: Env,
-        _issuer: Address,
+        issuer: Address,
         pagination: Pagination,
     ) -> PaginatedResult {
-        // Simplified return since iteration is hard
-        PaginatedResult {
-            data: Vec::new(&env),
-            total: 0,
-            page: pagination.page,
-            limit: pagination.limit,
-            has_next: false,
-        }
+        Self::paginate_requests(
+            &env,
+            Self::get_request_ids(&env, DataKey::IssuerRequestIds(issuer)),
+            pagination,
+        )
     }
 
     pub fn get_pending_requests_for_signer(
         env: Env,
-        _signer: Address,
+        signer: Address,
         pagination: Pagination,
     ) -> PaginatedResult {
-        // Simplified return
-        PaginatedResult {
-            data: Vec::new(&env),
-            total: 0,
-            page: pagination.page,
-            limit: pagination.limit,
-            has_next: false,
-        }
+        Self::paginate_requests(
+            &env,
+            Self::get_request_ids(&env, DataKey::SignerRequestIds(signer)),
+            pagination,
+        )
     }
 
     pub fn cancel_request(env: Env, request_id: String, requester: Address) -> bool {
@@ -551,6 +557,14 @@ impl CertificateContract {
     /// Upgrade the contract WASM. Only callable by the stored admin (i.e. AdminMultisigContract).
     pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
         let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("Contract not initialized");
+        admin.require_auth();
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
+    }
+
     /// Batch verify multiple certificates
     pub fn batch_verify_certificates(env: Env, ids: Vec<String>) -> VerificationReport {
         const BASE_VERIFICATION_COST: u64 = 100;
@@ -610,7 +624,6 @@ impl CertificateContract {
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         admin.require_auth();
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
 
         if admin != stored_admin {
             panic!("Only admin can set certificate expiry");
@@ -638,6 +651,74 @@ impl CertificateContract {
             cert.expires_at
         } else {
             None
+        }
+    }
+
+    fn append_request_id(env: &Env, key: DataKey, request_id: String) {
+        let mut request_ids = Self::get_request_ids(env, key.clone());
+
+        if !request_ids.contains(&request_id) {
+            request_ids.push_back(request_id);
+            env.storage().instance().set(&key, &request_ids);
+        }
+    }
+
+    fn get_request_ids(env: &Env, key: DataKey) -> Vec<String> {
+        env.storage()
+            .instance()
+            .get(&key)
+            .unwrap_or(Vec::<String>::new(env))
+    }
+
+    fn paginate_requests(
+        env: &Env,
+        request_ids: Vec<String>,
+        pagination: Pagination,
+    ) -> PaginatedResult {
+        let mut pending_requests = Vec::<PendingRequest>::new(env);
+
+        for request_id in request_ids.iter() {
+            if let Some(request) = env
+                .storage()
+                .instance()
+                .get::<_, PendingRequest>(&DataKey::PendingRequest(request_id))
+            {
+                if request.status == RequestStatus::Pending {
+                    pending_requests.push_back(request);
+                }
+            }
+        }
+
+        let total = pending_requests.len();
+        let mut page_data = Vec::<PendingRequest>::new(env);
+
+        if pagination.limit == 0 {
+            return PaginatedResult {
+                data: page_data,
+                total,
+                page: pagination.page,
+                limit: pagination.limit,
+                has_next: false,
+            };
+        }
+
+        let start = pagination.page.saturating_mul(pagination.limit);
+        let end = total.min(start.saturating_add(pagination.limit));
+
+        let mut index = start;
+        while index < end {
+            if let Some(request) = pending_requests.get(index) {
+                page_data.push_back(request);
+            }
+            index += 1;
+        }
+
+        PaginatedResult {
+            data: page_data,
+            total,
+            page: pagination.page,
+            limit: pagination.limit,
+            has_next: end < total,
         }
     }
 }

@@ -1,8 +1,8 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 
 use crate::{
-    MultisigConfig, PendingRequest, RequestStatus, SignatureResult, OptionalRequestStatus, 
-    Pagination, PaginatedResult, DataKey
+    DataKey, MultisigConfig, OptionalRequestStatus, PaginatedResult, Pagination, PendingRequest,
+    RequestStatus, SignatureResult,
 };
 
 #[contract]
@@ -20,7 +20,7 @@ impl MultisigCertificateContract {
         admin: Address,
     ) {
         admin.require_auth();
-        
+
         // Validate parameters
         #[allow(clippy::unnecessary_cast)]
         if threshold == 0
@@ -30,12 +30,16 @@ impl MultisigCertificateContract {
         {
             panic!("Invalid multisig parameters");
         }
-        
+
         // Check if already initialized
-        if env.storage().instance().has(&DataKey::MultisigConfig(issuer.clone())) {
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::MultisigConfig(issuer.clone()))
+        {
             panic!("Multisig config already exists for this issuer");
         }
-        
+
         // Store configuration
         env.storage().instance().set(
             &DataKey::MultisigConfig(issuer.clone()),
@@ -45,7 +49,7 @@ impl MultisigCertificateContract {
                 max_signers,
             },
         );
-        
+
         // Store admin for this issuer
         env.storage()
             .instance()
@@ -116,15 +120,12 @@ impl MultisigCertificateContract {
         metadata: String,
         expiration_days: u32,
     ) -> PendingRequest {
-        // Check if issuer has multisig configuration
-        if !env
+        let config: MultisigConfig = env
             .storage()
             .instance()
-            .has(&DataKey::MultisigConfig(issuer.clone()))
-        {
-            panic!("Issuer does not have multisig configuration");
-        }
-        
+            .get(&DataKey::MultisigConfig(issuer.clone()))
+            .expect("Issuer does not have multisig configuration");
+
         // Check if request already exists
         if env
             .storage()
@@ -149,14 +150,21 @@ impl MultisigCertificateContract {
 
         env.storage()
             .instance()
-            .set(&DataKey::PendingRequest(request_id), &request);
+            .set(&DataKey::PendingRequest(request_id.clone()), &request);
+
+        Self::append_request_id(&env, DataKey::IssuerRequestIds(issuer), request_id.clone());
+
+        for signer in config.signers.iter() {
+            Self::append_request_id(&env, DataKey::SignerRequestIds(signer), request_id.clone());
+        }
+
         request
     }
 
     /// Approve a pending certificate request
     pub fn approve_request(env: Env, request_id: String, approver: Address) -> SignatureResult {
         approver.require_auth();
-        
+
         let mut request: PendingRequest = env
             .storage()
             .instance()
@@ -191,7 +199,7 @@ impl MultisigCertificateContract {
             .instance()
             .get(&DataKey::MultisigConfig(request.issuer.clone()))
             .expect("Multisig config not found");
-        
+
         // Check if approver is an authorized signer
         if !config.signers.contains(&approver) {
             return SignatureResult {
@@ -221,7 +229,7 @@ impl MultisigCertificateContract {
         env.storage()
             .instance()
             .set(&DataKey::PendingRequest(request_id), &request);
-        
+
         SignatureResult {
             success: true,
             message: String::from_str(&env, "Approval recorded"),
@@ -237,7 +245,7 @@ impl MultisigCertificateContract {
         _reason: Option<String>,
     ) -> SignatureResult {
         rejector.require_auth();
-        
+
         let mut request: PendingRequest = env
             .storage()
             .instance()
@@ -259,7 +267,7 @@ impl MultisigCertificateContract {
             .instance()
             .get(&DataKey::MultisigConfig(request.issuer.clone()))
             .expect("Multisig config not found");
-        
+
         // Check if rejector is an authorized signer
         if !config.signers.contains(&rejector) {
             return SignatureResult {
@@ -281,16 +289,18 @@ impl MultisigCertificateContract {
         // Add rejection
         request.rejections.push_back(rejector);
 
-        // Check if threshold can still be reached
-        let remaining_possible_approvals = config.signers.len() - request.rejections.len();
-        if remaining_possible_approvals < config.threshold {
+        let remaining_eligible_approvers = config
+            .signers
+            .len()
+            .saturating_sub(request.rejections.len());
+        if remaining_eligible_approvers < config.threshold {
             request.status = RequestStatus::Rejected;
         }
 
         env.storage()
             .instance()
             .set(&DataKey::PendingRequest(request_id), &request);
-        
+
         SignatureResult {
             success: true,
             message: String::from_str(&env, "Rejection recorded"),
@@ -305,7 +315,7 @@ impl MultisigCertificateContract {
             .instance()
             .get(&DataKey::PendingRequest(request_id.clone()))
             .expect("Request not found");
-            
+
         if request.status != RequestStatus::Approved {
             return false;
         }
@@ -340,21 +350,21 @@ impl MultisigCertificateContract {
     /// Cancel a pending request (only proposer can cancel)
     pub fn cancel_request(env: Env, request_id: String, requester: Address) -> bool {
         requester.require_auth();
-        
+
         let mut request: PendingRequest = env
             .storage()
             .instance()
             .get(&DataKey::PendingRequest(request_id.clone()))
             .expect("Request not found");
-            
+
         if request.proposer != requester {
             panic!("Only proposer can cancel the request");
         }
-        
+
         if request.status != RequestStatus::Pending {
             return false;
         }
-        
+
         request.status = RequestStatus::Rejected;
         env.storage()
             .instance()
@@ -365,34 +375,94 @@ impl MultisigCertificateContract {
     /// Get pending requests for an issuer (simplified pagination)
     pub fn get_pending_requests_for_issuer(
         env: Env,
-        _issuer: Address,
+        issuer: Address,
         pagination: Pagination,
     ) -> PaginatedResult {
-        // Simplified return since iteration is complex in Soroban
-        // In a real implementation, you would need to store request IDs in a list
-        PaginatedResult {
-            data: Vec::new(&env),
-            total: 0,
-            page: pagination.page,
-            limit: pagination.limit,
-            has_next: false,
-        }
+        Self::paginate_requests(
+            &env,
+            Self::get_request_ids(&env, DataKey::IssuerRequestIds(issuer)),
+            pagination,
+        )
     }
 
     /// Get pending requests for a signer (simplified pagination)
     pub fn get_pending_requests_for_signer(
         env: Env,
-        _signer: Address,
+        signer: Address,
         pagination: Pagination,
     ) -> PaginatedResult {
-        // Simplified return since iteration is complex in Soroban
-        // In a real implementation, you would need to store request IDs in a list
+        Self::paginate_requests(
+            &env,
+            Self::get_request_ids(&env, DataKey::SignerRequestIds(signer)),
+            pagination,
+        )
+    }
+
+    fn append_request_id(env: &Env, key: DataKey, request_id: String) {
+        let mut request_ids = Self::get_request_ids(env, key.clone());
+
+        if !request_ids.contains(&request_id) {
+            request_ids.push_back(request_id);
+            env.storage().instance().set(&key, &request_ids);
+        }
+    }
+
+    fn get_request_ids(env: &Env, key: DataKey) -> Vec<String> {
+        env.storage()
+            .instance()
+            .get(&key)
+            .unwrap_or(Vec::<String>::new(env))
+    }
+
+    fn paginate_requests(
+        env: &Env,
+        request_ids: Vec<String>,
+        pagination: Pagination,
+    ) -> PaginatedResult {
+        let mut pending_requests = Vec::<PendingRequest>::new(env);
+
+        for request_id in request_ids.iter() {
+            if let Some(request) = env
+                .storage()
+                .instance()
+                .get::<_, PendingRequest>(&DataKey::PendingRequest(request_id))
+            {
+                if request.status == RequestStatus::Pending {
+                    pending_requests.push_back(request);
+                }
+            }
+        }
+
+        let total = pending_requests.len();
+        let mut page_data = Vec::<PendingRequest>::new(env);
+
+        if pagination.limit == 0 {
+            return PaginatedResult {
+                data: page_data,
+                total,
+                page: pagination.page,
+                limit: pagination.limit,
+                has_next: false,
+            };
+        }
+
+        let start = pagination.page.saturating_mul(pagination.limit);
+        let end = total.min(start.saturating_add(pagination.limit));
+
+        let mut index = start;
+        while index < end {
+            if let Some(request) = pending_requests.get(index) {
+                page_data.push_back(request);
+            }
+            index += 1;
+        }
+
         PaginatedResult {
-            data: Vec::new(&env),
-            total: 0,
+            data: page_data,
+            total,
             page: pagination.page,
             limit: pagination.limit,
-            has_next: false,
+            has_next: end < total,
         }
     }
 }

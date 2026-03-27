@@ -11,6 +11,7 @@ import { AuthService } from '../auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { Public } from '../../../common/decorators/public.decorator';
 
 /**
  * Version 2 of the Authentication API
@@ -26,6 +27,7 @@ export class AuthV2Controller {
   constructor(private authService: AuthService) {}
 
   @Post('login')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login user (v2) - Enhanced with metadata' })
   @ApiResponse({ status: HttpStatus.OK, type: AuthResponseDto })
@@ -44,6 +46,7 @@ export class AuthV2Controller {
   }
 
   @Post('register')
+  @Public()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register new user (v2) - Enhanced with metadata' })
   @ApiResponse({ status: HttpStatus.CREATED, type: AuthResponseDto })

@@ -58,6 +58,10 @@ export class UsersService {
 
   // ==================== Authentication ====================
 
+  async findByEmailWithPassword(email: string): Promise<User | null> {
+    return await this.userRepository.findByEmailWithPassword(email);
+  }
+
   async register(
     createUserDto: CreateUserDto,
   ): Promise<{ user: IUserPublic; tokens: IAuthTokens }> {
@@ -949,7 +953,9 @@ export class UsersService {
   }
 
   private getUserDisplayName(user: User): string {
-    return `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+    return (
+      `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email
+    );
   }
 
   private toPublicUser(user: User): IUserPublic {

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
+import { UserRepository } from '../users/repositories/user.repository';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -19,6 +20,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private jwtManagementService: JwtManagementService,
+    private userRepository: UserRepository,
   ) {}
 
   async validateUser(email: string, pass: string): Promise<any> {
@@ -26,9 +28,7 @@ export class AuthService {
     if (user) {
       // Need to get user with password for comparison
       const userWithPassword =
-        await this.usersService['userRepository'].findByEmailWithPassword(
-          email,
-        );
+        await this.userRepository.findByEmailWithPassword(email);
       if (
         userWithPassword &&
         (await bcrypt.compare(pass, userWithPassword.password))
@@ -106,13 +106,13 @@ export class AuthService {
   }
 
   async logout(user: any, logoutDto: LogoutDto): Promise<LogoutResponseDto> {
-    // Blacklist the access token
+    // Blacklist access token
     if (logoutDto.accessToken) {
       await this.jwtManagementService.blacklistToken(logoutDto.accessToken);
     }
 
-    // Optionally invalidate the refresh token stored in the database
-    await this.usersService['userRepository'].update(user.id, {
+    // Optionally invalidate refresh token stored in database
+    await this.userRepository.update(user.id, {
       refreshToken: undefined,
     });
 

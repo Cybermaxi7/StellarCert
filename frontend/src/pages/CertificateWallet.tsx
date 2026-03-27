@@ -102,32 +102,83 @@ const CertificateWallet = () => {
         url = await getCertificatePdfUrl(cert.id);
       }
 
-      if (!url) throw new Error('PDF not found');
+      // Validate URL before proceeding
+      if (!url || url.trim() === '') {
+        throw new Error('PDF URL not available');
+      }
+
+      // Check for placeholder/dummy URLs
+      if (url.includes('/api/dummy-pdf/') || url.includes('/dummy-pdf/')) {
+        throw new Error('PDF not yet available - certificate is being processed');
+      }
+
+      // Additional URL validation
+      try {
+        new URL(url); // Validate URL format
+      } catch {
+        throw new Error('Invalid PDF URL format');
+      }
 
       if (action === 'view') {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        // Try to open in new tab with error handling
+        const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!newWindow) {
+          // Fallback: try to download instead
+          console.warn('Popup blocked, falling back to download');
+          await handlePdfDownload(url, cert);
+        }
       } else {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('PDF unavailable');
-
-        const blob = await res.blob();
-        const objectUrl = window.URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = `Certificate-${cert.serialNumber || cert.id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
+        await handlePdfDownload(url, cert);
       }
     } catch (err: unknown) {
       console.error(err);
       const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(`Failed to ${action} certificate "${cert.title}". ${message}`);
+
+      // Provide more helpful error messages
+      let userFriendlyMessage = message;
+      if (message.includes('PDF not found')) {
+        userFriendlyMessage = 'Certificate PDF is not available yet. Please try again later.';
+      } else if (message.includes('not yet available')) {
+        userFriendlyMessage = 'Certificate is still being processed. PDF will be available soon.';
+      }
+
+      setError(`Failed to ${action} certificate "${cert.title}". ${userFriendlyMessage}`);
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  // Helper function for PDF download with retry logic
+  const handlePdfDownload = async (url: string, cert: Certificate, retryCount = 0): Promise<void> => {
+    const maxRetries = 2;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status === 404 && retryCount < maxRetries) {
+          console.warn(`PDF not found, retrying... (${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+          return handlePdfDownload(url, cert, retryCount + 1);
+        }
+        throw new Error(`PDF unavailable (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `Certificate-${cert.serialNumber || cert.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
+    } catch (error) {
+      if (retryCount >= maxRetries) {
+        throw error;
+      }
+      throw error;
     }
   };
 
@@ -162,11 +213,10 @@ const CertificateWallet = () => {
             <div key={cert.id} className="bg-white rounded-lg shadow-md p-6">
               <div className="flex justify-between mb-4">
                 <h3 className="text-xl font-semibold">{cert.title}</h3>
-                <span className={`px-2 py-1 text-sm rounded ${
-                  cert.status === 'active'
+                <span className={`px-2 py-1 text-sm rounded ${cert.status === 'active'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-red-100 text-red-800'
-                }`}>
+                  }`}>
                   {cert.status}
                 </span>
               </div>

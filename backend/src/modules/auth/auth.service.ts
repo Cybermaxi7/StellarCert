@@ -135,7 +135,12 @@ export class AuthService {
       }
 
       // Verify that the refresh token in the DB matches the one provided
-      if (user.refreshToken !== refreshToken) {
+      if (!user.refreshToken) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      const matches = await bcrypt.compare(refreshToken, user.refreshToken);
+      if (!matches) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
@@ -150,8 +155,9 @@ export class AuthService {
         await this.jwtManagementService.refreshAccessToken(refreshToken);
 
       // Update the refresh token in the database
+      const hashedRefreshToken = await bcrypt.hash(tokens.refreshToken, 12);
       await this.usersService['userRepository'].update(user.id, {
-        refreshToken: tokens.refreshToken,
+        refreshToken: hashedRefreshToken,
       });
 
       return {

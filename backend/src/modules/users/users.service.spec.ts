@@ -344,13 +344,13 @@ describe('UsersService', () => {
     it('should successfully refresh tokens', async () => {
       const userWithRefreshToken = {
         ...mockUser,
-        refreshToken: 'valid-refresh-token',
+        refreshToken: 'hashed-refresh-token',
         refreshTokenExpires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       };
-      mockUserRepository.findByRefreshToken.mockResolvedValue(
-        userWithRefreshToken,
-      );
+      mockJwtService.verify.mockReturnValue({ sub: userWithRefreshToken.id });
+      mockUserRepository.findById.mockResolvedValue(userWithRefreshToken);
       mockUserRepository.update.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       const result = await service.refreshTokens({
         refreshToken: 'valid-refresh-token',
@@ -361,7 +361,9 @@ describe('UsersService', () => {
     });
 
     it('should throw UnauthorizedException for invalid refresh token', async () => {
-      mockUserRepository.findByRefreshToken.mockResolvedValue(null);
+      mockJwtService.verify.mockImplementation(() => {
+        throw new Error('invalid');
+      });
 
       await expect(
         service.refreshTokens({ refreshToken: 'invalid-token' }),
@@ -371,15 +373,30 @@ describe('UsersService', () => {
     it('should throw UnauthorizedException for expired refresh token', async () => {
       const userWithExpiredToken = {
         ...mockUser,
-        refreshToken: 'expired-token',
+        refreshToken: 'hashed-refresh-token',
         refreshTokenExpires: new Date(Date.now() - 1000),
       };
-      mockUserRepository.findByRefreshToken.mockResolvedValue(
-        userWithExpiredToken,
-      );
+      mockJwtService.verify.mockReturnValue({ sub: userWithExpiredToken.id });
+      mockUserRepository.findById.mockResolvedValue(userWithExpiredToken);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       await expect(
         service.refreshTokens({ refreshToken: 'expired-token' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException when refresh token does not match stored hash', async () => {
+      const userWithRefreshToken = {
+        ...mockUser,
+        refreshToken: 'hashed-refresh-token',
+        refreshTokenExpires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      };
+      mockJwtService.verify.mockReturnValue({ sub: userWithRefreshToken.id });
+      mockUserRepository.findById.mockResolvedValue(userWithRefreshToken);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.refreshTokens({ refreshToken: 'valid-refresh-token' }),
       ).rejects.toThrow(UnauthorizedException);
     });
   });

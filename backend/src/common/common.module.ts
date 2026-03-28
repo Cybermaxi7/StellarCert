@@ -15,7 +15,7 @@ import { ResponseInterceptor } from './interceptors/response.interceptor';
 import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { GlobalExceptionFilter } from './exceptions/global-exception.filter';
-import { ValidationPipe } from './pipes/validation.pipe';
+import { RequestValidationPipe } from '../modules/security/pipes/request-validation.pipe';
 import {
   ValidationUtils,
   CryptoUtils,
@@ -26,7 +26,6 @@ import {
   RateLimitService,
   RATE_LIMIT_QUEUE_NAME,
 } from './rate-limiting/rate-limit.service';
-import { RateLimitGuard } from './guards/rate-limit.guard';
 import { Issuer } from '../modules/issuers/entities/issuer.entity';
 
 @Module({
@@ -75,10 +74,6 @@ import { Issuer } from '../modules/issuers/entities/issuer.entity';
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
-    {
-      provide: APP_GUARD,
-      useClass: RateLimitGuard,
-    },
 
     {
       provide: APP_INTERCEPTOR,
@@ -100,7 +95,7 @@ import { Issuer } from '../modules/issuers/entities/issuer.entity';
 
     {
       provide: APP_PIPE,
-      useClass: ValidationPipe,
+      useClass: RequestValidationPipe,
     },
 
     {

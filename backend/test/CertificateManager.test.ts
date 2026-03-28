@@ -55,7 +55,9 @@ describe('CertificateManager Integration Tests', () => {
         {
           provide: DuplicateDetectionService,
           useValue: {
-            checkForDuplicates: jest.fn().mockResolvedValue({ isDuplicate: false }),
+            checkForDuplicates: jest
+              .fn()
+              .mockResolvedValue({ isDuplicate: false }),
           },
         },
         {
@@ -88,7 +90,8 @@ describe('CertificateManager Integration Tests', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    certificateService = moduleFixture.get<CertificateService>(CertificateService);
+    certificateService =
+      moduleFixture.get<CertificateService>(CertificateService);
     stellarService = moduleFixture.get<StellarService>(StellarService);
     filesService = moduleFixture.get<FilesService>(FilesService);
   });
@@ -224,43 +227,47 @@ describe('CertificateManager Integration Tests', () => {
   describe('Stellar Blockchain Integration', () => {
     it('should verify transactions on Stellar network', async () => {
       // Test with a known testnet transaction hash
-      const testTxHash = '33886238139628d9386e62d4b828c4a035bbe06d458f47196f9421f2569e45e0';
-      
+      const testTxHash =
+        '33886238139628d9386e62d4b828c4a035bbe06d458f47196f9421f2569e45e0';
+
       const result = await stellarService.verifyTransaction(testTxHash);
-      
+
       expect(typeof result).toBe('boolean');
     });
 
     it('should validate Stellar public keys', () => {
       // Valid testnet public key
-      const validKey = 'GBGDYJWZMVJ3H6WUNM7H2JY3BK4XXL5QTV3M3YJZT6G7J3K4L5M6N7O8P9Q';
-      
+      const validKey =
+        'GBGDYJWZMVJ3H6WUNM7H2JY3BK4XXL5QTV3M3YJZT6G7J3K4L5M6N7O8P9Q';
+
       // Invalid keys
       const invalidKey1 = 'invalid-key';
-      const invalidKey2 = 'GBGDYJWZMVJ3H6WUNM7H2JY3BK4XXL5QTV3M3YJZT6G7J3K4L5M6N7O8P'; // Too short
-      
+      const invalidKey2 =
+        'GBGDYJWZMVJ3H6WUNM7H2JY3BK4XXL5QTV3M3YJZT6G7J3K4L5M6N7O8P'; // Too short
+
       expect(StellarService.isValidPublicKey(validKey)).toBe(false); // May not be valid format
       expect(StellarService.isValidPublicKey(invalidKey1)).toBe(false);
     });
 
     it('should validate Stellar secret keys', () => {
       // Test various key formats
-      const validSecret = 'SCZANGBA5YHTNYVVIC4Q6G6ck77G6MRFWEPN5R7W7G76FS5DBL2O6L7L';
+      const validSecret =
+        'SCZANGBA5YHTNYVVIC4Q6G6ck77G6MRFWEPN5R7W7G76FS5DBL2O6L7L';
       const invalidSecret = 'invalid-secret-key';
-      
+
       expect(StellarService.isValidSecretKey(invalidSecret)).toBe(false);
     });
 
     it('should get network info from configuration', () => {
       const networkInfo = stellarService.getNetworkInfo();
-      
+
       expect(networkInfo).toHaveProperty('network');
       expect(networkInfo).toHaveProperty('horizon');
     });
 
     it('should check network health', async () => {
       const isHealthy = await stellarService.checkNetworkHealth();
-      
+
       expect(typeof isHealthy).toBe('boolean');
     });
   });
@@ -279,7 +286,8 @@ describe('CertificateManager Integration Tests', () => {
         metadata: { course: 'Test Course' },
       };
 
-      const result = await filesService.generateAndUploadCertificate(certificateData);
+      const result =
+        await filesService.generateAndUploadCertificate(certificateData);
 
       expect(result).toHaveProperty('pdfUrl');
       expect(result).toHaveProperty('pdfKey');
@@ -289,7 +297,7 @@ describe('CertificateManager Integration Tests', () => {
 
     it('should generate standalone QR code', async () => {
       const verificationUrl = 'https://example.com/verify?code=TEST123';
-      
+
       const result = await filesService.generateAndUploadQrCode(
         verificationUrl,
         'test-qr',
@@ -320,7 +328,7 @@ describe('CertificateManager Integration Tests', () => {
 
     it('should find certificates by issuer ID', async () => {
       const result = await certificateService.findAll(1, 10, TEST_ISSUER_ID);
-      
+
       expect(result).toHaveProperty('certificates');
       expect(result).toHaveProperty('total');
       expect(Array.isArray(result.certificates)).toBe(true);
@@ -336,7 +344,7 @@ describe('CertificateManager Integration Tests', () => {
       };
 
       await certificateService.create(createDto);
-      
+
       const certificates = await certificateService.getCertificatesByRecipient(
         'recipient-find@example.com',
       );
@@ -377,15 +385,17 @@ describe('CertificateManager Integration Tests', () => {
       expect(certificate.expiresAt).toBeDefined();
       const expectedExpiry = new Date();
       expectedExpiry.setFullYear(expectedExpiry.getFullYear() + 1);
-      
+
       // Check it's approximately 1 year from now (within 1 day tolerance)
-      const diff = Math.abs(certificate.expiresAt.getTime() - expectedExpiry.getTime());
+      const diff = Math.abs(
+        certificate.expiresAt.getTime() - expectedExpiry.getTime(),
+      );
       expect(diff).toBeLessThan(24 * 60 * 60 * 1000); // 1 day in milliseconds
     });
 
     it('should allow custom expiry date', async () => {
       const customExpiry = new Date('2030-12-31');
-      
+
       const createDto = {
         issuerId: TEST_ISSUER_ID,
         recipientEmail: 'custom-expiry@example.com',
@@ -396,7 +406,7 @@ describe('CertificateManager Integration Tests', () => {
       };
 
       const certificate = await certificateService.create(createDto);
-      
+
       expect(certificate.expiresAt.getTime()).toBe(customExpiry.getTime());
     });
   });

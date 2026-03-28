@@ -34,6 +34,7 @@ function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/login" element={<Login />} />
               <Route path="/verify" element={<VerifyCertificate />} />
               <Route path="/profile" element={<IssuerProfile />} />

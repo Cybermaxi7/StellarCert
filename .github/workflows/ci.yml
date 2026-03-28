@@ -8,12 +8,16 @@ on:
 
 jobs:
   lint-and-typecheck:
-    name: Lint and Type Check
+    name: Lint and Type Check (${{ matrix.component }})
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
         component: [frontend, backend]
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.component }}
 
     steps:
       - name: Checkout code
@@ -26,19 +30,13 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: |
-          cd ${{ matrix.component }}
-          npm ci
+        run: npm ci --include=dev
 
       - name: Run linting
-        run: |
-          cd ${{ matrix.component }}
-          npm run lint
+        run: npm run lint
 
       - name: Run type checking
-        run: |
-          cd ${{ matrix.component }}
-          npm run typecheck
+        run: npm run typecheck
 
   build:
     name: Build Components
@@ -67,7 +65,7 @@ jobs:
         run: |
           if [ "${{ matrix.component }}" == "frontend" ] || [ "${{ matrix.component }}" == "backend" ]; then
             cd ${{ matrix.component }}
-            npm ci
+            npm ci --include=dev
           fi
 
       - name: Build frontend
@@ -217,16 +215,12 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: |
-          npm ci
-          cd frontend && npm ci
-          cd ../backend && npm ci
+        run: npm ci --include=dev
 
       - name: Build all components
         run: |
-          npm run build
-          cd frontend && npm run build
-          cd ../backend && npm run build
+          npm run build:backend
+          npm run build:frontend
 
       - name: Deploy to preview environment
         run: |

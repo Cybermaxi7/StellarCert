@@ -21,6 +21,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { MetadataSchemaModule } from './modules/metadata-schema/metadata-schema.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AdminAnalyticsModule } from './modules/admin-analytics/admin-analytics.module';
+import { SecurityModule } from './modules/security/security.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { AdminAnalyticsModule } from './modules/admin-analytics/admin-analytics.
     MetadataSchemaModule,
     NotificationsModule,
     AdminAnalyticsModule,
+    SecurityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

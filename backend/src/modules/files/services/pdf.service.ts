@@ -42,13 +42,11 @@ export class PdfService {
 
         // Header
         doc.moveDown(2);
-        const certificateTitle = data.title || data.courseName || 'Certificate of Completion';
-        doc
-          .fontSize(36)
-          .font('Helvetica-Bold')
-          .text(certificateTitle, {
-            align: 'center',
-          });
+        const certificateTitle =
+          data.title || data.courseName || 'Certificate of Completion';
+        doc.fontSize(36).font('Helvetica-Bold').text(certificateTitle, {
+          align: 'center',
+        });
         doc.moveDown();
 
         // Recipient Text
@@ -64,14 +62,14 @@ export class PdfService {
         doc.moveDown();
 
         // Course Text
-        const courseText = data.title || data.courseName ? 'Has successfully completed the course' : '';
+        const courseText =
+          data.title || data.courseName
+            ? 'Has successfully completed the course'
+            : '';
         if (courseText) {
-          doc
-            .fontSize(18)
-            .font('Helvetica')
-            .text(courseText, {
-              align: 'center',
-            });
+          doc.fontSize(18).font('Helvetica').text(courseText, {
+            align: 'center',
+          });
           doc.moveDown(0.5);
         }
 
@@ -91,7 +89,11 @@ export class PdfService {
         doc
           .fontSize(16)
           .font('Helvetica')
-          .text(`Date: ${new Date(certificateDate).toLocaleDateString()}`, 60, yPos);
+          .text(
+            `Date: ${new Date(certificateDate).toLocaleDateString()}`,
+            60,
+            yPos,
+          );
 
         doc
           .fontSize(16)

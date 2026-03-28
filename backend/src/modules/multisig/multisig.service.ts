@@ -804,15 +804,15 @@ export class MultisigService {
     }
   }
 
-  private mapNativeToPendingRequest(r: Record<string, unknown>): PendingRequest {
+  private mapNativeToPendingRequest(
+    r: Record<string, unknown>,
+  ): PendingRequest {
     return {
-      id: Buffer.isBuffer(r['id'])
-        ? (r['id'] as Buffer).toString()
-        : String(r['id']),
+      id: Buffer.isBuffer(r['id']) ? r['id'].toString() : String(r['id']),
       issuer: r['issuer'] as string,
       recipient: r['recipient'] as string,
       metadata: Buffer.isBuffer(r['metadata'])
-        ? (r['metadata'] as Buffer).toString()
+        ? r['metadata'].toString()
         : String(r['metadata']),
       proposer: r['proposer'] as string,
       approvals: (r['approvals'] as string[]) ?? [],

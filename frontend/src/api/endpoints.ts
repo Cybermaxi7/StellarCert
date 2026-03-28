@@ -37,7 +37,20 @@ export const API_URL = API_URL_BASE;
 
 // Helper function to simulate API delay
 const simulateDelay = () => new Promise((resolve) => setTimeout(resolve, 300));
+import axios from 'axios';
 
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api';
+
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 // Common error handler
 const handleError = (error: unknown, endpointName: string): never => {
   console.error(`Error in ${endpointName}:`, error);
@@ -196,23 +209,25 @@ export const fetchUserByEmail = async (email: string): Promise<User | null> => {
 };
 
 export const userApi = {
-  getProfile: async (): Promise<User> => {
-    return apiClient<User>("/users/profile");
-  },
-  getByEmail: fetchUserByEmail,
-  listAll: async (
-    params?: Record<string, string | number | boolean>,
-  ): Promise<PaginatedResponse<User>> => {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        searchParams.append(key, String(value));
-      });
-    }
-    return apiClient<PaginatedResponse<User>>(
-      `/users?${searchParams.toString()}`,
-    );
-  },
+    getProfile: async (): Promise<User> => {
+        return apiClient<User>('/users/profile');
+    },
+    updateProfile: async (data: ProfileUpdateData): Promise<User> => {
+        return apiClient<User>('/users/profile', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
+    getByEmail: fetchUserByEmail,
+    listAll: async (params?: Record<string, string | number | boolean>): Promise<PaginatedResponse<User>> => {
+        const searchParams = new URLSearchParams();
+        if (params) {
+            Object.entries(params).forEach(([key, value]) => {
+                searchParams.append(key, String(value));
+            });
+        }
+        return apiClient<PaginatedResponse<User>>(`/users?${searchParams.toString()}`);
+    },
 };
 
 // ==================== TEMPLATE MANAGEMENT ====================
@@ -587,6 +602,30 @@ export const certificateApi = {
   getQR: getCertificateQR,
 };
 
+export const certificateApi = {
+  getAll: (params?: Record<string, unknown>) =>
+    api.get('/certificates', { params }).then((r) => r.data),
+  getById: (id: string) =>
+    api.get(`/certificates/${id}`).then((r) => r.data),
+  issue: (data: Record<string, unknown>) =>
+    api.post('/certificates', data).then((r) => r.data),
+  revoke: (id: string, reason: string) =>
+    api.patch(`/certificates/${id}/revoke`, { reason }).then((r) => r.data),
+  verify: (certificateId: string) =>
+    api.get(`/certificates/verify/${certificateId}`).then((r) => r.data),
+};
+
+export const userApi = {
+  getAll: (params?: Record<string, unknown>) =>
+    api.get('/users', { params }).then((r) => r.data),
+  getById: (id: string) =>
+    api.get(`/users/${id}`).then((r) => r.data),
+  updateRole: (id: string, role: string) =>
+    api.patch(`/users/${id}/role`, { role }).then((r) => r.data),
+  toggleStatus: (id: string, isActive: boolean) =>
+    api.patch(`/users/${id}/status`, { isActive }).then((r) => r.data),
+  delete: (id: string) =>
+    api.delete(`/users/${id}`).then((r) => r.data),
 // ==================== AUTHENTICATION ====================
 
 export const loginApi = async (
@@ -851,13 +890,70 @@ export const analyticsApi = {
   },
 };
 
+export const adminAnalyticsApi = {
+    getAnalytics: async (params?: {
+        startDate?: string;
+        endDate?: string;
+    }): Promise<import('./types').AdminAnalytics> => {
+        const searchParams = new URLSearchParams();
+        if (params?.startDate) searchParams.set('startDate', params.startDate);
+        if (params?.endDate) searchParams.set('endDate', params.endDate);
+        const query = searchParams.toString();
+
+        return apiClient<import('./types').AdminAnalytics>(
+            `/admin/analytics${query ? `?${query}` : ''}`
+        );
+    },
+};
+
+export const auditApi = {
+    searchLogs: async (params?: Record<string, string | number | boolean | undefined>): Promise<import('./types').AuditLogSearchResponse> => {
+        const searchParams = new URLSearchParams();
+        if (params) {
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && String(value) !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+        }
+        const query = searchParams.toString();
+        return apiClient<import('./types').AuditLogSearchResponse>(
+            `/audit/logs${query ? `?${query}` : ''}`
+        );
+    },
+    getStatistics: async (params?: Record<string, string | number | boolean | undefined>): Promise<import('./types').AuditStatistics> => {
+        const searchParams = new URLSearchParams();
+        if (params) {
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && String(value) !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+        }
+        const query = searchParams.toString();
+        return apiClient<import('./types').AuditStatistics>(
+            `/audit/statistics${query ? `?${query}` : ''}`
+        );
+    },
+    exportCsvUrl: (params?: Record<string, string | number | boolean | undefined>): string => {
+        const searchParams = new URLSearchParams();
+        if (params) {
+            Object.entries(params).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && String(value) !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+        }
+        const query = searchParams.toString();
+        return `${API_URL}/audit/export${query ? `?${query}` : ''}`;
+    },
+};
+
 // Toggle dummy data
 export const toggleDummyData = (useDummy: boolean) => {
   USE_DUMMY_DATA = useDummy;
   console.log(`Using ${useDummy ? "dummy" : "real"} data`);
 };
-
-// ==================== ISSUER PROFILE MANAGEMENT ====================
 
 export const issuerProfileApi = {
   getStats: async (): Promise<IssuerStats> => {
@@ -936,6 +1032,84 @@ export const issuerProfileApi = {
       `/users/profile/activity?page=${page}&limit=${limit}`,
     );
   },
+  getProfile: (issuerId: string) =>
+    api.get(`/issuers/${issuerId}/profile`).then((r) => r.data),
+  updateProfile: (issuerId: string, data: Record<string, unknown>) =>
+    api.put(`/issuers/${issuerId}/profile`, data).then((r) => r.data),
+  getStats: (issuerId: string) =>
+    api.get(`/issuers/${issuerId}/stats`).then((r) => r.data),
+  getActivity: (issuerId: string, params?: Record<string, unknown>) =>
+    api.get(`/issuers/${issuerId}/activity`, { params }).then((r) => r.data),
+    getStats: async (): Promise<IssuerStats> => {
+        if (USE_DUMMY_DATA) {
+            await simulateDelay();
+            return {
+                totalCertificates: 125,
+                activeCertificates: 118,
+                revokedCertificates: 7,
+                expiredCertificates: 0,
+                totalVerifications: 2847,
+                lastLogin: new Date().toISOString()
+            };
+        }
+        return apiClient<IssuerStats>('/users/profile/stats');
+    },
+
+    getActivity: async (page: number = 1, limit: number = 10): Promise<PaginatedActivityLog> => {
+        if (USE_DUMMY_DATA) {
+            await simulateDelay();
+            const mockActivities = [
+                {
+                    id: '1',
+                    action: 'ISSUE_CERTIFICATE',
+                    description: 'Issued "Blockchain Fundamentals" certificate to Alice Johnson',
+                    ipAddress: '192.168.1.100',
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    id: '2',
+                    action: 'REVOKE_CERTIFICATE',
+                    description: 'Revoked certificate #CERT-2024-045',
+                    ipAddress: '192.168.1.100',
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    id: '3',
+                    action: 'UPDATE_PROFILE',
+                    description: 'Updated organization details',
+                    ipAddress: '192.168.1.100',
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+                }
+            ];
+
+            const total = mockActivities.length;
+            const totalPages = Math.ceil(total / limit);
+            const startIndex = (page - 1) * limit;
+            const endIndex = startIndex + limit;
+            const activities = mockActivities.slice(startIndex, endIndex);
+
+            return {
+                activities,
+                meta: {
+                    total,
+                    page,
+                    limit,
+                    totalPages
+                }
+            };
+        }
+        return apiClient<PaginatedActivityLog>(`/users/profile/activity?page=${page}&limit=${limit}`);
+    },
+
+    updateProfile: async (data: ProfileUpdateData): Promise<User> => {
+        return apiClient<User>('/users/profile/issuer', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    },
 
   updateProfile: async (data: ProfileUpdateData): Promise<User> => {
     if (USE_DUMMY_DATA) {
@@ -983,3 +1157,5 @@ export const issuerProfileApi = {
     return response.json();
   },
 };
+
+export default api;

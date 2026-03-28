@@ -1,4 +1,6 @@
-export default function View(): JSX.Element {
+import React from 'react';
+
+export default function View(): React.JSX.Element {
   return (
     <section className="space-y-8">
       <div>

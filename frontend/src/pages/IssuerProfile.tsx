@@ -183,7 +183,7 @@ const IssuerProfile = () => {
         uploadedProfilePicture = uploadResult.profilePicture;
       }
 
-      const updatedUser = await issuerProfileApi.updateProfile({
+      const updatedUser = await userApi.updateProfile({
         firstName: formData.firstName,
         lastName: formData.lastName,
         username: formData.username || undefined,

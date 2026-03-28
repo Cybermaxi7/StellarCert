@@ -53,6 +53,7 @@ const Login = () => {
       if (res.accessToken) {
         tokenStorage.setAccessToken(res.accessToken);
         tokenStorage.setRefreshToken(res.refreshToken);
+        localStorage.setItem("user", JSON.stringify(res.user));
 
 
         // Redirect to dashboard or home page

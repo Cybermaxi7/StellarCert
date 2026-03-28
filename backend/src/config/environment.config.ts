@@ -131,6 +131,34 @@ class EnvironmentVariables {
   @IsOptional()
   @IsNumber()
   AUDIT_RETENTION_DAYS?: number;
+
+  @IsOptional()
+  @IsString()
+  REQUEST_SIZE_LIMIT?: string;
+
+  @IsOptional()
+  @IsNumber()
+  RATE_LIMIT_DEFAULT_WINDOW_MS?: number;
+
+  @IsOptional()
+  @IsNumber()
+  RATE_LIMIT_DEFAULT_MAX_REQUESTS?: number;
+
+  @IsOptional()
+  @IsNumber()
+  AUTH_BRUTE_FORCE_WINDOW_MS?: number;
+
+  @IsOptional()
+  @IsNumber()
+  AUTH_BRUTE_FORCE_MAX_ATTEMPTS?: number;
+
+  @IsOptional()
+  @IsString()
+  SECURITY_CSP?: string;
+
+  @IsOptional()
+  @IsString()
+  SECURITY_FORCE_HSTS?: string;
 }
 
 export function validateEnv(): EnvironmentVariables {
@@ -174,6 +202,22 @@ export function validateEnv(): EnvironmentVariables {
       AUDIT_RETENTION_DAYS: process.env.AUDIT_RETENTION_DAYS
         ? parseInt(process.env.AUDIT_RETENTION_DAYS, 10)
         : undefined,
+      REQUEST_SIZE_LIMIT: process.env.REQUEST_SIZE_LIMIT,
+      RATE_LIMIT_DEFAULT_WINDOW_MS: process.env.RATE_LIMIT_DEFAULT_WINDOW_MS
+        ? parseInt(process.env.RATE_LIMIT_DEFAULT_WINDOW_MS, 10)
+        : undefined,
+      RATE_LIMIT_DEFAULT_MAX_REQUESTS: process.env
+        .RATE_LIMIT_DEFAULT_MAX_REQUESTS
+        ? parseInt(process.env.RATE_LIMIT_DEFAULT_MAX_REQUESTS, 10)
+        : undefined,
+      AUTH_BRUTE_FORCE_WINDOW_MS: process.env.AUTH_BRUTE_FORCE_WINDOW_MS
+        ? parseInt(process.env.AUTH_BRUTE_FORCE_WINDOW_MS, 10)
+        : undefined,
+      AUTH_BRUTE_FORCE_MAX_ATTEMPTS: process.env.AUTH_BRUTE_FORCE_MAX_ATTEMPTS
+        ? parseInt(process.env.AUTH_BRUTE_FORCE_MAX_ATTEMPTS, 10)
+        : undefined,
+      SECURITY_CSP: process.env.SECURITY_CSP,
+      SECURITY_FORCE_HSTS: process.env.SECURITY_FORCE_HSTS,
     },
     { enableImplicitConversion: true },
   );

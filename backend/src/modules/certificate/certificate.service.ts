@@ -108,17 +108,18 @@ export class CertificateService {
       const verificationUrl = this.buildVerificationUrl(
         savedCertificate.verificationCode,
       );
-      const { pdfUrl, qrUrl } = await this.filesService.generateAndUploadCertificate({
-        tokenId: savedCertificate.id,
-        recipientName: savedCertificate.recipientName,
-        title: savedCertificate.title,
-        description: savedCertificate.description,
-        issuedAt: savedCertificate.issuedAt,
-        expiresAt: savedCertificate.expiresAt,
-        issuerName: savedCertificate.issuer?.name || 'Unknown Issuer',
-        verificationUrl,
-        metadata: savedCertificate.metadata,
-      });
+      const { pdfUrl, qrUrl } =
+        await this.filesService.generateAndUploadCertificate({
+          tokenId: savedCertificate.id,
+          recipientName: savedCertificate.recipientName,
+          title: savedCertificate.title,
+          description: savedCertificate.description,
+          issuedAt: savedCertificate.issuedAt,
+          expiresAt: savedCertificate.expiresAt,
+          issuerName: savedCertificate.issuer?.name || 'Unknown Issuer',
+          verificationUrl,
+          metadata: savedCertificate.metadata,
+        });
 
       savedCertificate.pdfUrl = pdfUrl;
       savedCertificate.qrCodeUrl = qrUrl;

@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { Award, Download, Search, Wallet, ShieldAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { analyticsApi } from '../api';
+import { analyticsApi, UserRole } from '../api';
 import type {
   ActivityItem,
   DashboardStats,
   IssuanceTrendPoint,
   StatusDistribution
 } from '../api';
+import AdminAnalyticsDashboard from './AdminAnalyticsDashboard';
 
 type DateRange = {
   startDate: string;
@@ -251,7 +252,7 @@ const createInitialDateRange = (): DateRange => {
   };
 };
 
-const Dashboard = () => {
+const IssuerDashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -614,6 +615,25 @@ const Dashboard = () => {
       </div>
     </div>
   );
+};
+
+const Dashboard = () => {
+  const userRole = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { role?: string } | null;
+      return parsed?.role ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  if (userRole === UserRole.ADMIN) {
+    return <AdminAnalyticsDashboard />;
+  }
+
+  return <IssuerDashboard />;
 };
 
 export default Dashboard;

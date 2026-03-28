@@ -137,6 +137,85 @@ export interface DashboardStats {
   recentActivity: ActivityItem[];
 }
 
+export interface UsersByRoleStats {
+  users: number;
+  issuers: number;
+  admins: number;
+  total: number;
+}
+
+export interface UsersByStatusStats {
+  active: number;
+  inactive: number;
+  suspended: number;
+  pendingVerification: number;
+}
+
+export interface CertificatesByStatusStats {
+  active: number;
+  revoked: number;
+  expired: number;
+  total: number;
+}
+
+export interface TopIssuerAnalytics {
+  issuerId: string;
+  issuerName: string;
+  certificateCount: number;
+  percentage: number;
+}
+
+export interface VerificationTrends {
+  total: number;
+  successful: number;
+  failed: number;
+  successRate: number;
+  last24Hours: number;
+  last7Days: number;
+  last30Days: number;
+}
+
+export interface TrendPoint {
+  date: string;
+  count: number;
+}
+
+export interface AdminAnalytics {
+  usersByRole: UsersByRoleStats;
+  usersByStatus: UsersByStatusStats;
+  certificatesByStatus: CertificatesByStatusStats;
+  topIssuers: TopIssuerAnalytics[];
+  verificationTrends: VerificationTrends;
+  userRegistrationTrend: TrendPoint[];
+  certificateIssuanceTrend: TrendPoint[];
+  totalIssuers: number;
+}
+
+export interface AuditLogItem {
+  id: string;
+  action: string;
+  description: string;
+  userId?: string;
+  resourceId?: string;
+  resourceType?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface AuditLogSearchResponse {
+  data: AuditLogItem[];
+  total: number;
+}
+
+export interface AuditStatistics {
+  total: number;
+  byAction?: Record<string, number>;
+  byUser?: Record<string, number>;
+  byResourceType?: Record<string, number>;
+}
+
 /**
  * Standard API error response
  */

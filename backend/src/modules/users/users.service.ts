@@ -190,10 +190,35 @@ export class UsersService {
   async refreshTokens(refreshTokenDto: RefreshTokenDto): Promise<IAuthTokens> {
     const { refreshToken } = refreshTokenDto;
 
-    // Find user by refresh token
-    const user = await this.userRepository.findByRefreshToken(refreshToken);
+    // Verify refresh token signature and extract payload
+    let payload: { sub: string } | null = null;
+    try {
+      const decoded = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+      }) as Record<string, unknown>;
 
-    if (!user) {
+      if (!decoded || !decoded.sub || typeof decoded.sub !== 'string') {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      payload = { sub: decoded.sub };
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const userId = payload?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // Load user and validate stored refresh token hash
+    const user = await this.userRepository.findById(userId);
+    if (!user || !user.refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const matches = await bcrypt.compare(refreshToken, user.refreshToken);
+    if (!matches) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -876,8 +901,13 @@ export class UsersService {
     const refreshTokenExpires = new Date();
     refreshTokenExpires.setDate(refreshTokenExpires.getDate() + 7);
 
-    await this.userRepository.update(user.id, {
+    const hashedRefreshToken = await bcrypt.hash(
       refreshToken,
+      this.SALT_ROUNDS,
+    );
+
+    await this.userRepository.update(user.id, {
+      refreshToken: hashedRefreshToken,
       refreshTokenExpires,
     });
 
@@ -949,7 +979,9 @@ export class UsersService {
   }
 
   private getUserDisplayName(user: User): string {
-    return `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+    return (
+      `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email
+    );
   }
 
   private toPublicUser(user: User): IUserPublic {

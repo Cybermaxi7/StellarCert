@@ -8,7 +8,6 @@ import {
   Memo,
   Asset,
   Operation,
-  TimeoutInfinite,
 } from '@stellar/stellar-sdk';
 import axios from 'axios';
 
@@ -137,7 +136,7 @@ export class StellarService implements OnModuleInit {
           }),
         )
         .addMemo(Memo.text(memoText))
-        .setTimeout(TimeoutInfinite)
+        .setTimeout(30)
         .build();
 
       transaction.sign(this.issuerKeypair);

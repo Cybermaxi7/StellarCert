@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Search,
     ChevronUp,
@@ -26,6 +26,23 @@ interface CertificateTableProps {
     onSuccess?: (message: string) => void;
 }
 
+// Debounce hook for search inputs
+const useDebounce = (value: string, delay: number) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+};
+
 const CertificateTable = ({ onError, onSuccess }: CertificateTableProps) => {
     // State for data and pagination
     const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -37,6 +54,7 @@ const CertificateTable = ({ onError, onSuccess }: CertificateTableProps) => {
 
     // State for filters
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search, 300);
     const [statusFilter, setStatusFilter] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -86,7 +104,7 @@ const CertificateTable = ({ onError, onSuccess }: CertificateTableProps) => {
             const params = {
                 page,
                 limit,
-                search: search || undefined,
+                search: debouncedSearch || undefined,
                 status: statusFilter || undefined,
                 sortBy,
                 sortOrder,
@@ -107,7 +125,7 @@ const CertificateTable = ({ onError, onSuccess }: CertificateTableProps) => {
         } finally {
             setLoading(false);
         }
-    }, [page, limit, search, statusFilter, sortBy, sortOrder, startDate, endDate, onError]);
+    }, [page, limit, debouncedSearch, statusFilter, sortBy, sortOrder, startDate, endDate, onError]);
 
     useEffect(() => {
         fetchCertificates();

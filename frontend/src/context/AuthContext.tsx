@@ -2,6 +2,17 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { User } from '../api/types';
 import { tokenStorage } from '../api/tokens';
 
+// Helper function to check if JWT token is expired
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Date.now() / 1000;
+    return payload.exp < currentTime;
+  } catch {
+    return true; // If token is malformed, consider it expired
+  }
+};
+
 interface AuthContextValue {
   user: User | null;
   setUser: (user: User | null) => void;
@@ -28,10 +39,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return null;
     }
   });
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    setIsLoading(false);
+    // Check token expiration on app load
+    const checkTokenExpiration = () => {
+      const accessToken = tokenStorage.getAccessToken();
+      
+      if (accessToken && isTokenExpired(accessToken)) {
+        // Token is expired, clear auth state
+        console.warn('Access token expired, clearing authentication state');
+        tokenStorage.clearTokens();
+        setUserState(null);
+        localStorage.removeItem('user');
+      } else if (!accessToken) {
+        // No token, clear user state
+        setUserState(null);
+        localStorage.removeItem('user');
+      }
+      
+      setIsLoading(false);
+    };
+
+    checkTokenExpiration();
+
+    // Set up periodic token expiration check (every 5 minutes)
+    const interval = setInterval(checkTokenExpiration, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -51,20 +86,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const clearAuth = () => {
     setUserState(null);
     tokenStorage.clearTokens();
+    localStorage.removeItem('user');
   };
 
   const login = (accessToken: string, refreshToken: string, nextUser: User) => {
+    // Validate token before setting
+    if (isTokenExpired(accessToken)) {
+      console.error('Attempted to login with expired token');
+      return;
+    }
+    
     tokenStorage.setAccessToken(accessToken);
     tokenStorage.setRefreshToken(refreshToken);
     setUserState(nextUser);
   };
+
+  // Check if user is authenticated (has valid token and user data)
+  const isAuthenticated = !!user && !!tokenStorage.getAccessToken() && !isTokenExpired(tokenStorage.getAccessToken()!);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         setUser,
-        isAuthenticated: !!user && !!tokenStorage.getAccessToken(),
+        isAuthenticated,
         isLoading,
         clearAuth,
         login,

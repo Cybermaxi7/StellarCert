@@ -56,13 +56,43 @@ const handleError = (error: unknown, endpointName: string): never => {
 };
 
 /**
- * Standardized API client for all requests
+ * Sleep utility for retry delays
+ */
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Retry configuration
+ */
+interface RetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  backoffFactor: number;
+  retryCondition?: (error: any) => boolean;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 2,
+  baseDelay: 300,
+  maxDelay: 2000,
+  backoffFactor: 2,
+  retryCondition: (error) => {
+    // Retry on network errors and 5xx server errors
+    return !error.statusCode || (error.statusCode >= 500 && error.statusCode < 600);
+  }
+};
+
+/**
+ * Standardized API client for all requests with retry logic
  */
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {},
+  retryConfig: Partial<RetryConfig> = {},
 ): Promise<T> {
+  const config = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
   const url = `${API_URL}${endpoint}`;
+  const isGetRequest = !options.method || options.method.toUpperCase() === 'GET';
 
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
@@ -72,42 +102,66 @@ export async function apiClient<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+  const attemptRequest = async (attempt: number): Promise<T> => {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-    if (!response.ok) {
-      const errorData: ApiError = await response.json().catch(() => ({
-        message: response.statusText || "API request failed",
-        statusCode: response.status,
-      }));
+      if (!response.ok) {
+        const errorData: ApiError = await response.json().catch(() => ({
+          message: response.statusText || "API request failed",
+          statusCode: response.status,
+        }));
 
-      if (response.status === 401) {
-        tokenStorage.clearTokens();
+        if (response.status === 401) {
+          tokenStorage.clearTokens();
+        }
+
+        throw errorData;
       }
 
-      throw errorData;
-    }
+      if (response.status === 204) {
+        return {} as T;
+      }
 
-    if (response.status === 204) {
-      return {} as T;
-    }
+      return await response.json();
+    } catch (error) {
+      // Don't retry if this is the last attempt or retry condition is not met
+      if (attempt >= config.maxRetries || !config.retryCondition?.(error)) {
+        if ((error as ApiError).statusCode) {
+          throw error;
+        }
 
-    return await response.json();
-  } catch (error) {
-    if ((error as ApiError).statusCode) {
-      throw error;
-    }
+        const apiError: ApiError = {
+          message:
+            error instanceof Error ? error.message : "An unexpected error occurred",
+          statusCode: 0,
+          error: "Network Error",
+        };
+        throw apiError;
+      }
 
-    const apiError: ApiError = {
-      message:
-        error instanceof Error ? error.message : "An unexpected error occurred",
-      statusCode: 0,
-      error: "Network Error",
-    };
-    throw apiError;
+      // Calculate delay with exponential backoff
+      const delay = Math.min(
+        config.baseDelay * Math.pow(config.backoffFactor, attempt - 1),
+        config.maxDelay
+      );
+
+      console.warn(`API request failed (attempt ${attempt}/${config.maxRetries + 1}), retrying in ${delay}ms:`, error);
+      
+      await sleep(delay);
+      return attemptRequest(attempt + 1);
+    }
+  };
+
+  // Only apply retry logic to GET requests by default
+  if (isGetRequest) {
+    return attemptRequest(1);
+  } else {
+    // For non-GET requests, make a single attempt
+    return attemptRequest(config.maxRetries + 1);
   }
 }
 

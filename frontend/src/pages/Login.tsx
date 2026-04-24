@@ -26,12 +26,14 @@ const Login = () => {
   const [formData, setFormData] = useState<{
     email: string;
     password: string;
+    confirmPassword: string;
     firstName: string;
     lastName: string;
     role: UserRole;
   }>({
     email: "",
     password: "",
+    confirmPassword: "",
     firstName: "",
     lastName: "",
     role: UserRole.RECIPIENT,
@@ -72,6 +74,19 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Validate password confirmation for registration
+    if (!isLogin) {
+      if (formData.password !== formData.confirmPassword) {
+        setError("Passwords do not match. Please confirm your password.");
+        return;
+      }
+      
+      if (formData.password.length < 8) {
+        setError("Password must be at least 8 characters long.");
+        return;
+      }
+    }
 
     try {
       if (!isLogin) {
@@ -293,6 +308,46 @@ const Login = () => {
               </div>
             )}
           </div>
+
+          {/* Confirm Password - only show during registration */}
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData({ ...formData, confirmPassword: e.target.value })
+                  }
+                  className="w-full px-4 py-2 border rounded-md 
+                  bg-white dark:bg-slate-800
+                  text-gray-900 dark:text-white
+                  border-gray-300 dark:border-slate-700
+                  focus:ring-blue-500 focus:border-blue-500 pr-10"
+                  required
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  {formData.confirmPassword && (
+                    <span className={`text-sm ${
+                      formData.password === formData.confirmPassword
+                        ? 'text-green-500'
+                        : 'text-red-500'
+                    }`}>
+                      {formData.password === formData.confirmPassword ? '✓' : '✗'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  Passwords do not match
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Role (sign-up only) */}
           {!isLogin && (

@@ -4,6 +4,23 @@ import { useSearchParams } from 'react-router-dom';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { certificateApi, VerificationResult } from '../api';
 
+// Debounce hook for search inputs
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 type VerificationState = {
   loading: boolean;
   result: VerificationResult | null;
@@ -13,6 +30,7 @@ type VerificationState = {
 export default function VerifyCertificate(): JSX.Element {
   const [searchParams] = useSearchParams();
   const [serial, setSerial] = useState('');
+  const debouncedSerial = useDebounce(serial, 300);
   const [showQrScanner, setShowQrScanner] = useState(false);
   const qrScannerRef = useRef<Html5QrcodeScanner | null>(null);
   const [state, setState] = useState<VerificationState>({
@@ -73,6 +91,13 @@ export default function VerifyCertificate(): JSX.Element {
       handleVerify(serialParam.trim());
     }
   }, [searchParams, handleVerify]);
+
+  // Auto-verify when debounced serial changes (for manual input)
+  useEffect(() => {
+    if (debouncedSerial.trim() && debouncedSerial.length > 2) {
+      handleVerify(debouncedSerial.trim());
+    }
+  }, [debouncedSerial, handleVerify]);
 
   // Initialize QR scanner
   useEffect(() => {

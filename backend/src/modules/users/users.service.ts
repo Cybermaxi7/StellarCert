@@ -360,8 +360,13 @@ export class UsersService {
       passwordResetExpires.getHours() + this.PASSWORD_RESET_EXPIRY_HOURS,
     );
 
-    await this.userRepository.update(user.id, {
+    const hashedPasswordResetToken = await bcrypt.hash(
       passwordResetToken,
+      this.SALT_ROUNDS,
+    );
+
+    await this.userRepository.update(user.id, {
+      passwordResetToken: hashedPasswordResetToken,
       passwordResetExpires,
     });
 
@@ -383,7 +388,24 @@ export class UsersService {
       throw new BadRequestException('Passwords do not match');
     }
 
-    const user = await this.userRepository.findByPasswordResetToken(token);
+    const usersWithResetTokens =
+      await this.userRepository.findUsersWithPasswordResetTokens();
+    let user: User | null = null;
+
+    for (const candidate of usersWithResetTokens) {
+      if (!candidate.passwordResetToken) {
+        continue;
+      }
+
+      const tokenMatches = await bcrypt.compare(
+        token,
+        candidate.passwordResetToken,
+      );
+      if (tokenMatches) {
+        user = candidate;
+        break;
+      }
+    }
 
     if (!user) {
       throw new BadRequestException('Invalid reset token');

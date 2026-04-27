@@ -5,6 +5,8 @@ import {
   SelectQueryBuilder,
   FindOptionsWhere,
   ILike,
+  Not,
+  IsNull,
 } from 'typeorm';
 import { User, UserRole, UserStatus } from '../entities/user.entity';
 import { IPaginatedResult, IPaginationOptions } from '../interfaces';
@@ -60,8 +62,10 @@ export class UserRepository {
     });
   }
 
-  async findByPasswordResetToken(token: string): Promise<User | null> {
-    return this.repository.findOne({ where: { passwordResetToken: token } });
+  async findUsersWithPasswordResetTokens(): Promise<User[]> {
+    return this.repository.find({
+      where: { passwordResetToken: Not(IsNull()) },
+    });
   }
 
   async findByRefreshToken(refreshToken: string): Promise<User | null> {

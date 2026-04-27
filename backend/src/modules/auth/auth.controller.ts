@@ -20,6 +20,7 @@ import { TwoFactorVerifyDto } from './dto/two-factor-verify.dto';
 import { TwoFactorTokenDto } from './dto/two-factor-token.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
+import { RateLimit } from '../security/decorators/rate-limit.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -51,6 +52,7 @@ export class AuthController {
   //     user,
   //   };
   @Post('login')
+  @RateLimit({ limit: 5, windowMs: 60_000, keyBy: 'ip' })
   @Public()
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
@@ -59,6 +61,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @RateLimit({ limit: 5, windowMs: 60_000, keyBy: 'ip' })
   @Public()
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {

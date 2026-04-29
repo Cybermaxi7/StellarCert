@@ -1,5 +1,6 @@
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, String, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, IntoVal, String,
+    Vec,
 };
 
 #[contracttype]
@@ -225,6 +226,24 @@ impl AdminMultisigContract {
         Self::approve_action(env, proposal_id, approver)
     }
 
+    pub fn set_certificate_contract(env: Env, signer: Address, certificate_contract: Address) {
+        signer.require_auth();
+
+        let config = Self::get_config(env.clone());
+        Self::require_signer(&config.signers, &signer);
+
+        env.storage()
+            .instance()
+            .set(&AdminMultisigDataKey::CertificateContractId, &certificate_contract);
+    }
+
+    pub fn get_certificate_contract(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&AdminMultisigDataKey::CertificateContractId)
+            .expect("Certificate contract not configured")
+    }
+
     fn execute_action(env: Env, proposal_id: String) -> AdminProposalStatus {
         let proposal_key = AdminMultisigDataKey::AdminProposal(proposal_id.clone());
         let mut proposal: AdminProposal = env
@@ -246,6 +265,18 @@ impl AdminMultisigContract {
                 env.storage()
                     .instance()
                     .set(&AdminMultisigDataKey::RemovedIssuer(issuer.clone()), &true);
+
+                let certificate_contract: Address = env
+                    .storage()
+                    .instance()
+                    .get(&AdminMultisigDataKey::CertificateContractId)
+                    .expect("Certificate contract not configured");
+
+                let _: () = env.invoke_contract(
+                    &certificate_contract,
+                    &soroban_sdk::Symbol::new(&env, "remove_issuer"),
+                    soroban_sdk::vec![&env, issuer.clone().into_val(&env)],
+                );
             }
             AdminAction::UpdateConfig(threshold, signers, proposal_window) => {
                 Self::validate_config(signers, *threshold, *proposal_window);

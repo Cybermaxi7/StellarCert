@@ -47,12 +47,15 @@ fn test_admin_multisig_flow() {
 #[test]
 fn test_remove_issuer_action_executes_after_threshold() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
-    let client = AdminMultisigContractClient::new(&env, &contract_id);
+    let admin_multisig_contract_id = env.register_contract(None, AdminMultisigContract);
+    let client = AdminMultisigContractClient::new(&env, &admin_multisig_contract_id);
+    let certificate_contract_id = env.register_contract(None, CertificateContract);
+    let certificate_client = CertificateContractClient::new(&env, &certificate_contract_id);
 
     let admin1 = Address::generate(&env);
     let admin2 = Address::generate(&env);
     let issuer = Address::generate(&env);
+    let owner = Address::generate(&env);
 
     let mut signers = Vec::new(&env);
     signers.push_back(admin1.clone());
@@ -60,7 +63,11 @@ fn test_remove_issuer_action_executes_after_threshold() {
 
     env.mock_all_auths();
 
+    certificate_client.initialize(&admin_multisig_contract_id);
+    certificate_client.add_issuer(&issuer);
+
     client.init_admin_multisig(&2, &signers, &5);
+    client.set_certificate_contract(&admin1, &certificate_contract_id);
 
     let proposal_id = String::from_str(&env, "remove-issuer-1");
     let action = AdminAction::RemoveIssuer(issuer.clone());
@@ -74,4 +81,13 @@ fn test_remove_issuer_action_executes_after_threshold() {
     let status = client.approve_action(&proposal_id, &admin2);
     assert_eq!(status, AdminProposalStatus::Executed);
     assert!(client.is_issuer_removed(&issuer));
+
+    let issue_result = certificate_client.try_issue_certificate(
+        &String::from_str(&env, "issuer-removed-cert"),
+        &issuer,
+        &owner,
+        &String::from_str(&env, "ipfs://meta"),
+        &None,
+    );
+    assert!(issue_result.is_err());
 }

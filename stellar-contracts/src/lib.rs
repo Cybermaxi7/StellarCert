@@ -20,6 +20,8 @@ pub use admin_multisig::*;
 mod admin_multisig_test;
 #[cfg(test)]
 mod multisig_test;
+#[cfg(test)]
+mod issuer_management_test;
 
 #[contract]
 pub struct CertificateContract;
@@ -45,6 +47,17 @@ impl CertificateContract {
         env.storage()
             .instance()
             .set(&DataKey::Issuer(issuer), &true);
+    }
+
+    /// Remove an authorized issuer (only admin can call)
+    pub fn remove_issuer(env: Env, issuer: Address) {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("Contract not initialized");
+        admin.require_auth();
+        env.storage().instance().remove(&DataKey::Issuer(issuer));
     }
 
     /// Issue a new certificate

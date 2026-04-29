@@ -20,6 +20,8 @@ pub use admin_multisig::*;
 mod admin_multisig_test;
 #[cfg(test)]
 mod multisig_test;
+#[cfg(test)]
+mod test;
 
 #[contract]
 pub struct CertificateContract;
@@ -85,6 +87,15 @@ impl CertificateContract {
             metadata_uri,
             issued_at: env.ledger().timestamp(),
             expires_at,
+            version: CertificateVersion {
+                major: 1,
+                minor: 0,
+                patch: 0,
+                build: None,
+            },
+            revocation_reason: None,
+            status_reason: None,
+            parent_certificate_id: None,
         };
 
         // Store the certificate
@@ -113,6 +124,7 @@ impl CertificateContract {
         }
 
         cert.status = CertificateStatus::Revoked;
+        cert.revocation_reason = Some(reason.clone());
         env.storage()
             .instance()
             .set(&DataKey::Certificate(id.clone()), &cert);
@@ -136,8 +148,8 @@ impl CertificateContract {
         env.storage().instance().get(&DataKey::Certificate(id))
     }
 
-    /// Suspend a certificate
-    pub fn suspend_certificate(env: Env, id: String) {
+    /// Suspend a certificate (temporarily disable with reason)
+    pub fn suspend_certificate(env: Env, id: String, reason: String) {
         let mut cert: Certificate = env
             .storage()
             .instance()
@@ -145,18 +157,19 @@ impl CertificateContract {
             .expect("Certificate not found");
         cert.issuer.require_auth();
 
-        if cert.status == CertificateStatus::Suspended {
-            panic!("Certificate is already suspended");
+        if cert.status != CertificateStatus::Active {
+            panic!("Can only suspend active certificates");
         }
 
         cert.status = CertificateStatus::Suspended;
+        cert.status_reason = Some(reason);
         env.storage()
             .instance()
             .set(&DataKey::Certificate(id.clone()), &cert);
     }
 
     /// Reinstate a suspended certificate
-    pub fn reinstate_certificate(env: Env, id: String) {
+    pub fn reinstate_certificate(env: Env, id: String, reason: String) {
         let mut cert: Certificate = env
             .storage()
             .instance()
@@ -169,44 +182,7 @@ impl CertificateContract {
         }
 
         cert.status = CertificateStatus::Active;
-        env.storage()
-            .instance()
-            .set(&DataKey::Certificate(id.clone()), &cert);
-    }
-
-    /// Freeze a certificate
-    pub fn freeze_certificate(env: Env, id: String) {
-        let mut cert: Certificate = env
-            .storage()
-            .instance()
-            .get(&DataKey::Certificate(id.clone()))
-            .expect("Certificate not found");
-        cert.issuer.require_auth();
-
-        if cert.status == CertificateStatus::Frozen {
-            panic!("Certificate is already frozen");
-        }
-
-        cert.status = CertificateStatus::Frozen;
-        env.storage()
-            .instance()
-            .set(&DataKey::Certificate(id.clone()), &cert);
-    }
-
-    /// Unfreeze a certificate
-    pub fn unfreeze_certificate(env: Env, id: String) {
-        let mut cert: Certificate = env
-            .storage()
-            .instance()
-            .get(&DataKey::Certificate(id.clone()))
-            .expect("Certificate not found");
-        cert.issuer.require_auth();
-
-        if cert.status != CertificateStatus::Frozen {
-            panic!("Certificate is not frozen");
-        }
-
-        cert.status = CertificateStatus::Active;
+        cert.status_reason = Some(reason);
         env.storage()
             .instance()
             .set(&DataKey::Certificate(id.clone()), &cert);
@@ -231,6 +207,398 @@ impl CertificateContract {
         } else {
             false
         }
+    }
+
+    /// Update certificate metadata (requires issuer auth)
+    pub fn update_certificate_metadata(env: Env, id: String, new_metadata_uri: String) {
+        let mut cert: Certificate = env
+            .storage()
+            .instance()
+            .get(&DataKey::Certificate(id.clone()))
+            .expect("Certificate not found");
+        cert.issuer.require_auth();
+
+        if cert.status != CertificateStatus::Active {
+            panic!("Can only update metadata for active certificates");
+        }
+
+        // Increment version
+        cert.version.minor += 1;
+        cert.metadata_uri = new_metadata_uri;
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Certificate(id), &cert);
+    }
+
+    /// Reissue a certificate with new version (creates child certificate)
+    pub fn reissue_certificate(
+        env: Env,
+        old_id: String,
+        new_id: String,
+        issuer: Address,
+        new_owner: Option<Address>,
+        new_metadata_uri: String,
+        new_expires_at: Option<u64>,
+    ) {
+        issuer.require_auth();
+
+        // Verify issuer is authorized
+        if !env
+            .storage()
+            .instance()
+            .get::<_, bool>(&DataKey::Issuer(issuer.clone()))
+            .unwrap_or(false)
+        {
+            panic!("Address is not an authorized issuer");
+        }
+
+        // Get original certificate
+        let original_cert: Certificate = env
+            .storage()
+            .instance()
+            .get(&DataKey::Certificate(old_id.clone()))
+            .expect("Original certificate not found");
+
+        // Verify issuer matches
+        if original_cert.issuer != issuer {
+            panic!("Issuer does not match original certificate");
+        }
+
+        // Check new ID doesn't exist
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::Certificate(new_id.clone()))
+        {
+            panic!("Certificate with new ID already exists");
+        }
+
+        // Create new certificate with incremented version
+        let new_version = CertificateVersion {
+            major: original_cert.version.major,
+            minor: original_cert.version.minor + 1,
+            patch: 0,
+            build: None,
+        };
+
+        let new_cert = Certificate {
+            id: new_id.clone(),
+            issuer: issuer.clone(),
+            owner: new_owner.unwrap_or(original_cert.owner),
+            status: CertificateStatus::Active,
+            metadata_uri: new_metadata_uri,
+            issued_at: env.ledger().timestamp(),
+            expires_at: new_expires_at,
+            version: new_version,
+            revocation_reason: None,
+            status_reason: None,
+            parent_certificate_id: Some(old_id.clone()),
+        };
+
+        // Store new certificate
+        env.storage()
+            .instance()
+            .set(&DataKey::Certificate(new_id.clone()), &new_cert);
+
+        // Emit issuance event
+        env.events().publish(
+            (symbol_short!("issued"), new_id.clone()),
+            CertificateIssuedEvent {
+                id: new_id,
+                issuer,
+                owner: new_cert.owner,
+            },
+        );
+    }
+
+    // --- Certificate Transfer Functions ---
+
+    /// Initiate a certificate ownership transfer
+    pub fn initiate_transfer(
+        env: Env,
+        transfer_id: String,
+        certificate_id: String,
+        from_owner: Address,
+        to_owner: Address,
+        require_revocation: bool,
+        transfer_fee: u64,
+        memo: Option<String>,
+    ) {
+        from_owner.require_auth();
+
+        // Get certificate
+        let cert: Certificate = env
+            .storage()
+            .instance()
+            .get(&DataKey::Certificate(certificate_id.clone()))
+            .expect("Certificate not found");
+
+        // Verify caller is the current owner
+        if cert.owner != from_owner {
+            panic!("Only certificate owner can initiate transfer");
+        }
+
+        // Verify certificate is active
+        if cert.status != CertificateStatus::Active {
+            panic!("Can only transfer active certificates");
+        }
+
+        // Check if transfer already exists
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::Transfer(transfer_id.clone()))
+        {
+            panic!("Transfer with this ID already exists");
+        }
+
+        // Create transfer record
+        let transfer = CertificateTransfer {
+            id: transfer_id.clone(),
+            certificate_id: certificate_id.clone(),
+            from_owner: from_owner.clone(),
+            to_owner: to_owner.clone(),
+            status: TransferStatus::Pending,
+            initiated_at: env.ledger().timestamp(),
+            accepted_at: None,
+            completed_at: None,
+            require_revocation,
+            transfer_fee,
+            memo,
+        };
+
+        // Store transfer
+        env.storage()
+            .instance()
+            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+
+        // Add to certificate's transfer history
+        let mut transfers = Self::get_transfer_history(&env, certificate_id.clone());
+        transfers.push_back(transfer_id.clone());
+        env.storage()
+            .instance()
+            .set(&DataKey::CertificateTransfers(certificate_id), &transfers);
+
+        // Add to pending transfers for new owner
+        let mut pending = Self::get_pending_transfers(&env, to_owner.clone());
+        pending.push_back(transfer_id.clone());
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingTransfers(to_owner), &pending);
+
+        // Increment transfer count
+        let count = Self::get_transfer_count(&env);
+        env.storage().instance().set(&DataKey::TransferCount, &(count + 1));
+    }
+
+    /// Accept a pending certificate transfer
+    pub fn accept_transfer(env: Env, transfer_id: String, to_owner: Address) {
+        to_owner.require_auth();
+
+        let mut transfer: CertificateTransfer = env
+            .storage()
+            .instance()
+            .get(&DataKey::Transfer(transfer_id.clone()))
+            .expect("Transfer not found");
+
+        // Verify caller is the intended recipient
+        if transfer.to_owner != to_owner {
+            panic!("Only intended recipient can accept transfer");
+        }
+
+        // Verify transfer is pending
+        if transfer.status != TransferStatus::Pending {
+            panic!("Transfer is not pending");
+        }
+
+        transfer.status = TransferStatus::Accepted;
+        transfer.accepted_at = Some(env.ledger().timestamp());
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+
+        // Remove from pending transfers
+        let pending = Self::get_pending_transfers(&env, to_owner.clone());
+        let mut updated_pending = Vec::<String>::new(&env);
+        for tid in pending.iter() {
+            if tid != transfer_id {
+                updated_pending.push_back(tid);
+            }
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingTransfers(to_owner), &updated_pending);
+    }
+
+    /// Complete a certificate transfer (requires original owner auth)
+    pub fn complete_transfer(env: Env, transfer_id: String, from_owner: Address) {
+        from_owner.require_auth();
+
+        let mut transfer: CertificateTransfer = env
+            .storage()
+            .instance()
+            .get(&DataKey::Transfer(transfer_id.clone()))
+            .expect("Transfer not found");
+
+        // Verify caller is the original owner
+        if transfer.from_owner != from_owner {
+            panic!("Only original owner can complete transfer");
+        }
+
+        // Verify transfer is accepted
+        if transfer.status != TransferStatus::Accepted {
+            panic!("Transfer must be accepted before completion");
+        }
+
+        // Update certificate ownership
+        let mut cert: Certificate = env
+            .storage()
+            .instance()
+            .get(&DataKey::Certificate(transfer.certificate_id.clone()))
+            .expect("Certificate not found");
+
+        cert.owner = transfer.to_owner.clone();
+
+        // Revoke if required
+        if transfer.require_revocation {
+            cert.status = CertificateStatus::Revoked;
+            cert.revocation_reason = Some(String::from_str(&env, "Transferred to new owner"));
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Certificate(transfer.certificate_id.clone()), &cert);
+
+        // Update transfer status
+        transfer.status = TransferStatus::Completed;
+        transfer.completed_at = Some(env.ledger().timestamp());
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+    }
+
+    /// Reject a pending certificate transfer
+    pub fn reject_transfer(env: Env, transfer_id: String, to_owner: Address) {
+        to_owner.require_auth();
+
+        let mut transfer: CertificateTransfer = env
+            .storage()
+            .instance()
+            .get(&DataKey::Transfer(transfer_id.clone()))
+            .expect("Transfer not found");
+
+        if transfer.to_owner != to_owner {
+            panic!("Only intended recipient can reject transfer");
+        }
+
+        if transfer.status != TransferStatus::Pending {
+            panic!("Transfer is not pending");
+        }
+
+        transfer.status = TransferStatus::Rejected;
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+
+        // Remove from pending transfers
+        let pending = Self::get_pending_transfers(&env, to_owner.clone());
+        let mut updated_pending = Vec::<String>::new(&env);
+        for tid in pending.iter() {
+            if tid != transfer_id {
+                updated_pending.push_back(tid);
+            }
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingTransfers(to_owner), &updated_pending);
+    }
+
+    /// Cancel a pending certificate transfer
+    pub fn cancel_transfer(env: Env, transfer_id: String, from_owner: Address) {
+        from_owner.require_auth();
+
+        let mut transfer: CertificateTransfer = env
+            .storage()
+            .instance()
+            .get(&DataKey::Transfer(transfer_id.clone()))
+            .expect("Transfer not found");
+
+        if transfer.from_owner != from_owner {
+            panic!("Only initiator can cancel transfer");
+        }
+
+        if transfer.status != TransferStatus::Pending {
+            panic!("Transfer is not pending");
+        }
+
+        transfer.status = TransferStatus::Cancelled;
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+
+        // Remove from pending transfers
+        let pending = Self::get_pending_transfers(&env, transfer.to_owner.clone());
+        let mut updated_pending = Vec::<String>::new(&env);
+        for tid in pending.iter() {
+            if tid != transfer_id {
+                updated_pending.push_back(tid);
+            }
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingTransfers(transfer.to_owner), &updated_pending);
+    }
+
+    /// Get transfer history for a certificate
+    fn get_transfer_history(env: &Env, certificate_id: String) -> Vec<String> {
+        env.storage()
+            .instance()
+            .get(&DataKey::CertificateTransfers(certificate_id))
+            .unwrap_or(Vec::<String>::new(env))
+    }
+
+    /// Get pending transfers for an address
+    fn get_pending_transfers(env: &Env, address: Address) -> Vec<String> {
+        env.storage()
+            .instance()
+            .get(&DataKey::PendingTransfers(address))
+            .unwrap_or(Vec::<String>::new(env))
+    }
+
+    /// Get total transfer count
+    fn get_transfer_count(env: &Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::TransferCount)
+            .unwrap_or(0)
+    }
+
+    /// Get transfer details
+    pub fn get_transfer(env: Env, transfer_id: String) -> CertificateTransfer {
+        env.storage()
+            .instance()
+            .get(&DataKey::Transfer(transfer_id))
+            .expect("Transfer not found")
+    }
+
+    /// Get transfer history for a certificate (public wrapper)
+    pub fn get_transfer_history_public(env: Env, certificate_id: String) -> Vec<String> {
+        Self::get_transfer_history(&env, certificate_id)
+    }
+
+    /// Get pending transfers for an address (public wrapper)
+    pub fn get_pending_transfers_public(env: Env, address: Address) -> Vec<String> {
+        Self::get_pending_transfers(&env, address)
+    }
+
+    /// Get total transfer count (public wrapper)
+    pub fn get_transfer_count_public(env: Env) -> u32 {
+        Self::get_transfer_count(&env)
     }
 
     // --- Multisig Functions ---

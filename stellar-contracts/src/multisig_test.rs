@@ -237,7 +237,7 @@ fn test_cancel_request() {
     let admin = Address::generate(&env);
     let issuer = Address::generate(&env);
     let recipient = Address::generate(&env);
-    let proposer = Address::generate(&env); // Same as issuer in this case
+    let _proposer = Address::generate(&env); // Same as issuer in this case
     let signer1 = Address::generate(&env);
     let signer2 = Address::generate(&env);
 
@@ -376,7 +376,7 @@ fn test_expired_request() {
 
     // Manually advance time to expire the request (in a real test, we'd use ledger time)
     // This is a simplified test - in reality we'd check the expiration in the contract
-    let is_expired = client.is_expired(&request_id);
+    let _is_expired = client.is_expired(&request_id);
     // Note: This depends on the current ledger time vs expiration time
     // For this test, we're just checking the function exists
 }

@@ -23,14 +23,14 @@ fn test_status_transition_events() {
     client.issue_certificate(&cert_id, &issuer, &owner, &metadata_uri, &None);
 
     // Test suspend
-    client.suspend_certificate(&cert_id);
+    client.suspend_certificate(&cert_id, &String::from_str(&env, "suspended for testing"));
     let events = env.events().all();
     let last_event = events.last().unwrap();
     assert_eq!(last_event.0, contract_id);
     assert_eq!(last_event.1, (symbol_short!("suspend"), cert_id.clone()).into_val(&env));
     
     // Test reinstate
-    client.reinstate_certificate(&cert_id);
+    client.reinstate_certificate(&cert_id, &String::from_str(&env, "reinstated for testing"));
     let events = env.events().all();
     let last_event = events.last().unwrap();
     assert_eq!(last_event.1, (symbol_short!("reinstat"), cert_id.clone()).into_val(&env));

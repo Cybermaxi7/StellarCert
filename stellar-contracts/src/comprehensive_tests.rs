@@ -73,11 +73,11 @@ fn test_suspend_and_reinstate_certificate() {
         &None,
     );
 
-    client.suspend_certificate(&id);
+    client.suspend_certificate(&id, &String::from_str(&env, "suspended for testing"));
     let cert = client.get_certificate(&id).unwrap();
     assert_eq!(cert.status, CertificateStatus::Suspended);
 
-    client.reinstate_certificate(&id);
+    client.reinstate_certificate(&id, &String::from_str(&env, "reinstated for testing"));
     let cert = client.get_certificate(&id).unwrap();
     assert_eq!(cert.status, CertificateStatus::Active);
 }

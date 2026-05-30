@@ -39,14 +39,12 @@ interface AuditLogQueryParams {
   limit?: number;
 }
 
-// Configuration flag - can be enabled via Vite env `VITE_USE_DUMMY_DATA` ("true"/"false").
-const VITE_USE_DUMMY = (
-  import.meta as unknown as { env: Record<string, string> }
-).env?.VITE_USE_DUMMY_DATA;
-let USE_DUMMY_DATA = VITE_USE_DUMMY ? VITE_USE_DUMMY === "true" : false;
-const API_URL_BASE =
-  (import.meta as unknown as { env: Record<string, string> }).env
-    ?.VITE_API_URL || "http://localhost:3000/api/v1";
+// Configuration flag - can be enabled via Vite env `VITE_USE_DUMMY_DATA` ("true"/"false") in development only.
+const viteEnv = import.meta as unknown as { env: Record<string, string> };
+const USE_DUMMY_DATA =
+  viteEnv.env?.VITE_USE_DUMMY_DATA === "true" &&
+  viteEnv.env?.MODE !== "production";
+const API_URL_BASE = viteEnv.env?.VITE_API_URL || "http://localhost:3000/api/v1";
 export const API_URL = API_URL_BASE;
 
 // Helper function to simulate API delay
@@ -1150,10 +1148,6 @@ export const adminAnalyticsApi = {
     if (params?.endDate) searchParams.set("endDate", params.endDate);
     return apiClient(`/admin/analytics?${searchParams.toString()}`);
   },
-};
-
-export const toggleDummyData = (useDummy: boolean) => {
-  USE_DUMMY_DATA = useDummy;
 };
 
 export const issuerProfileApi = {

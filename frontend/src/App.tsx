@@ -6,6 +6,7 @@ import ProtectedRoute from "./guard/ProtectedRoute";
 import { NotificationProvider } from "./context/NotificationContext";
 import { AuthProvider } from "./context/AuthContext";
 import ToastContainer from "./components/Toast";
+import { UserRole } from "./api";
 
 // Lazy load page components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -53,7 +54,12 @@ function App() {
                 <Route
                   element={
                     <ProtectedRoute
-                      allowedRoles={["user", "verifier", "issuer", "admin"]}
+                      allowedRoles={[
+                        UserRole.RECIPIENT,
+                        UserRole.VERIFIER,
+                        UserRole.ISSUER,
+                        UserRole.ADMIN,
+                      ]}
                     />
                   }
                 >
@@ -62,7 +68,9 @@ function App() {
 
                 <Route
                   element={
-                    <ProtectedRoute allowedRoles={["issuer", "admin"]} />
+                    <ProtectedRoute
+                      allowedRoles={[UserRole.ISSUER, UserRole.ADMIN]}
+                    />
                   }
                 >
                   <Route path="/issue" element={<IssueCertificate />} />

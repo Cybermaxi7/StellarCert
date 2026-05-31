@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { CheckCircle } from 'lucide-react';
 import { certificateApi, VerificationResult } from '../api';
 
 // Debounce hook for search inputs
@@ -27,6 +28,10 @@ type VerificationState = {
   error: string | null;
 };
 
+type ToastState = {
+  message: string;
+};
+
 export default function VerifyCertificate(): JSX.Element {
   const [searchParams] = useSearchParams();
   const [serial, setSerial] = useState('');
@@ -38,6 +43,7 @@ export default function VerifyCertificate(): JSX.Element {
     result: null,
     error: null,
   });
+  const [toast, setToast] = useState<ToastState | null>(null);
   const isVerifyingRef = useRef(false);
 
   const handleVerify = useCallback(async (serialToVerify: string) => {
@@ -98,6 +104,13 @@ export default function VerifyCertificate(): JSX.Element {
       handleVerify(debouncedSerial.trim());
     }
   }, [debouncedSerial, handleVerify]);
+
+  // Auto-dismiss toast after 3 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const timeoutId = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
 
   // Initialize QR scanner
   useEffect(() => {
@@ -169,6 +182,16 @@ export default function VerifyCertificate(): JSX.Element {
 
   return (
     <section className="space-y-8">
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed right-4 top-4 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 shadow-lg dark:border-green-900/40 dark:bg-green-900/30">
+            <CheckCircle className="h-5 w-5 flex-shrink-0 text-green-500" />
+            <p className="text-sm font-medium text-green-900 dark:text-green-100">{toast.message}</p>
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center gap-3">
           <svg

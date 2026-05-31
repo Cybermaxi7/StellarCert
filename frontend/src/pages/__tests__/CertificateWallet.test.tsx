@@ -68,3 +68,21 @@ describe("CertificateWallet", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled());
   });
 });
+
+it('clears previous error before retrying', async () => {
+  render(<CertificateWallet />);
+
+  await user.click(claimButton);
+
+  expect(
+    screen.getByText(/failed/i),
+  ).toBeInTheDocument();
+
+  mockedClaim.mockResolvedValueOnce({});
+
+  await user.click(claimButton);
+
+  expect(
+    screen.queryByText(/failed/i),
+  ).not.toBeInTheDocument();
+});

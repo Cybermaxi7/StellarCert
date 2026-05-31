@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { Shield, Award, Search, ShieldAlert } from "lucide-react";
 import Navbar from "./components/Header";
@@ -32,6 +32,10 @@ const PageLoader = () => (
 );
 
 function App() {
+  const location = useLocation();
+  const showFeatureOverview =
+    location.pathname === "/" || location.pathname === "/dashboard";
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 transition-colors duration-250">
       <AuthProvider>
@@ -85,6 +89,7 @@ function App() {
           </div>
 
           {/* Feature Overview Section */}
+          {showFeatureOverview && (
           <section className="bg-white dark:bg-slate-900 py-12 mt-8 transition-colors duration-250">
             <div className="container mx-auto px-4">
               <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">
@@ -136,6 +141,7 @@ function App() {
               </div>
             </div>
           </section>
+          )}
           <ToastContainer />
         </NotificationProvider>
       </AuthProvider>

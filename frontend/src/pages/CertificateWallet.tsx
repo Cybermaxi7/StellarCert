@@ -20,6 +20,7 @@ import {
 } from "../api";
 import { useAuth } from "../context/AuthContext";
 
+
 const CertificateWallet = () => {
   const { user } = useAuth();
   const [certificates, setCertificates] = useState<Certificate[]>([]);
@@ -176,6 +177,16 @@ const CertificateWallet = () => {
       setActionLoadingId(null);
     }
   };
+
+  const handleClaim = async () => {
+  setError(null);
+
+  try {
+    await claimCertificate(id);
+  } catch {
+    setError('Unable to claim certificate');
+  }
+};
 
   // Helper function for PDF download with retry logic
   const handlePdfDownload = async (

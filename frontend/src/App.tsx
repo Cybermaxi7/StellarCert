@@ -23,6 +23,7 @@ const CertificateManagementPage = lazy(
 const NotificationPreferences = lazy(
   () => import("./pages/NotificationPreferences"),
 );
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -84,6 +85,9 @@ function App() {
                     element={<CertificateManagementPage />}
                   />
                 </Route>
+
+                {/* Catch-all: must be last */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </div>

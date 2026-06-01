@@ -11,6 +11,8 @@ export enum UserRole {
   USER = 'user',
   ISSUER = 'issuer',
   ADMIN = 'admin',
+  RECIPIENT = 'recipient',
+  VERIFIER = 'verifier',
 }
 
 export enum UserStatus {

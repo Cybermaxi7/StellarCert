@@ -303,13 +303,15 @@ export class UsersService {
     certificateIssuanceCounts: Record<string, number>;
   }> {
     // This method is kept in UsersService as it aggregates data from multiple services
-    const [total, active, userCount, issuerCount, adminCount] =
+    const [total, active, userCount, issuerCount, adminCount, recipientCount, verifierCount] =
       await Promise.all([
         this.userRepository.countTotal(),
         this.userRepository.countActive(),
         this.userRepository.countByRole(UserRole.USER),
         this.userRepository.countByRole(UserRole.ISSUER),
         this.userRepository.countByRole(UserRole.ADMIN),
+        this.userRepository.countByRole(UserRole.RECIPIENT),
+        this.userRepository.countByRole(UserRole.VERIFIER),
       ]);
 
     const [activeStatus, inactiveStatus, suspendedStatus, pendingStatus] =
@@ -330,6 +332,8 @@ export class UsersService {
         [UserRole.USER]: userCount,
         [UserRole.ISSUER]: issuerCount,
         [UserRole.ADMIN]: adminCount,
+        [UserRole.RECIPIENT]: recipientCount,
+        [UserRole.VERIFIER]: verifierCount,
       },
       byStatus: {
         [UserStatus.ACTIVE]: activeStatus,

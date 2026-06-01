@@ -1,3 +1,4 @@
+<<
 import React, { useState } from 'react';
 import { certificateApi } from '../api/endpoints';
 import type { VerificationResult } from '../api/types';
@@ -226,3 +227,4 @@ const Verify: React.FC = () => {
 };
 
 export default Verify;
+export { default } from './VerifyCertificate';

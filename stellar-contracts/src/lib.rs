@@ -577,7 +577,17 @@ impl CertificateContract {
         // Revoke if required
         if transfer.require_revocation {
             cert.status = CertificateStatus::Revoked;
-            cert.revocation_reason = Some(String::from_str(&env, "Transferred to new owner"));
+            let reason = String::from_str(&env, "Transferred to new owner");
+            cert.revocation_reason = Some(reason.clone());
+
+            // Emit and publish revocation event for indexers
+            env.events().publish(
+                (symbol_short!("revoked"), transfer.certificate_id.clone()),
+                CertificateRevokedEvent {
+                    id: transfer.certificate_id.clone(),
+                    reason,
+                },
+            );
         }
 
         env.storage()

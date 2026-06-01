@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { findCertBySerialNumber, revokeCertificate } from '../api';
 import { AlertTriangle, Search, ShieldAlert, CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -48,6 +48,7 @@ const RevokeCertificate = () => {
   const [message, setMessage] = useState<Message>({ type: '', text: '' });
   const [reasonError, setReasonError] = useState('');
   const [revoked, setRevoked] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const navigate = useNavigate();
 
   const handleLookup = async (e: React.FormEvent) => {
@@ -87,7 +88,7 @@ const RevokeCertificate = () => {
     }
   };
 
-  const handleRevoke = async (e: React.FormEvent) => {
+  const handleRevoke = (e: React.FormEvent) => {
     e.preventDefault();
     const validationError = validateReason(reason);
     if (validationError) {
@@ -95,12 +96,11 @@ const RevokeCertificate = () => {
       return;
     }
     setReasonError('');
+    setShowConfirm(true);
+  };
 
-    const confirmed = window.confirm(
-      `Are you sure you want to revoke the certificate for "${certificate?.recipientName}"?\n\nThis action is permanent and cannot be undone.`
-    );
-    if (!confirmed) return;
-
+  const handleConfirmRevoke = async () => {
+    setShowConfirm(false);
     setRevokeLoading(true);
     setMessage({ type: '', text: '' });
 
@@ -125,6 +125,14 @@ const RevokeCertificate = () => {
   };
 
   return (
+    <>
+    {showConfirm && (
+      <ConfirmDialog
+        recipientName={certificate?.recipientName ?? ''}
+        onConfirm={handleConfirmRevoke}
+        onCancel={() => setShowConfirm(false)}
+      />
+    )}
     <div className="max-w-2xl mx-auto mt-6 px-4">
 
       {/* Page Header */}
@@ -273,6 +281,80 @@ const RevokeCertificate = () => {
       {!certificate && !revoked && message.text && (
         <MessageBanner type={message.type} text={message.text} />
       )}
+    </div>
+    </>
+  );
+};
+
+const ConfirmDialog = ({
+  recipientName,
+  onConfirm,
+  onCancel,
+}: {
+  recipientName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) => {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-desc"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 w-full max-w-md p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+          </div>
+          <div>
+            <h2 id="confirm-title" className="text-base font-semibold text-gray-900 dark:text-white">
+              Confirm Certificate Revocation
+            </h2>
+            <p id="confirm-desc" className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+              You are about to permanently revoke the certificate for{' '}
+              <strong className="text-gray-900 dark:text-white">{recipientName}</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md px-4 py-3 mb-6">
+          <p className="text-sm text-red-700 dark:text-red-300">
+            This action <strong>cannot be undone</strong>. The revocation will be published to the
+            Certificate Revocation List and all verified parties will be notified.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            ref={cancelRef}
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-md hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            <XCircle className="w-4 h-4" />
+            Yes, Revoke Certificate
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

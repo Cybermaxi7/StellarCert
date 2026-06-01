@@ -27,6 +27,7 @@ import {
   RejectTransferDto,
   ForgotPasswordRequest,
   ResetPasswordRequest,
+  VerifyEmailRequest,
 } from "./types";
 import { tokenStorage } from "./tokens";
 
@@ -192,7 +193,7 @@ export async function apiClient<T>(
       );
 
       console.warn(`API request failed (attempt ${attempt}/${config.maxRetries + 1}), retrying in ${delay}ms:`, error);
-      
+
       await sleep(delay);
       return attemptRequest(attempt + 1, hasTriedRefresh);
     }
@@ -279,7 +280,7 @@ export const fetchUserByEmail = async (email: string): Promise<User | null> => {
   if (USE_DUMMY_DATA) {
     await simulateDelay();
     const user = dummyData.users.find((user) => user.email === email);
-    console.log("Dummy User Data:", user);
+    
     return user || null;
   }
 
@@ -929,6 +930,14 @@ export const authApi = {
       body: JSON.stringify(data),
     });
   },
+  verifyEmail: async (
+    data: VerifyEmailRequest,
+  ): Promise<{ message: string }> => {
+    return apiClient("/users/verify-email", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 export const login = loginApi;
@@ -1303,7 +1312,36 @@ export const auditApi = {
     return apiClient<PaginatedActivityLog>(`/audit?${searchParams.toString()}`);
   },
   getCertificateHistory: async (certificateId: string): Promise<ActivityItem[]> => {
-    return apiClient<ActivityItem[]>(`/audit/resource/CERTIFICATE/${certificateId}`);
+    if (USE_DUMMY_DATA) {
+      await simulateDelay();
+      return [
+        {
+          type: "issue",
+          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          description: "Certificate issued to recipient",
+        },
+        {
+          type: "verify",
+          date: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+          description: "Certificate verified by verifier",
+        },
+      ];
+    }
+    const response = await apiClient<any[]>(`/audit/certificates/${certificateId}/history`);
+    return response.map((log) => {
+      let type: "issue" | "verify" | "revoke" = "issue";
+      const actionLower = (log.action || "").toLowerCase();
+      if (actionLower.includes("revoke")) {
+        type = "revoke";
+      } else if (actionLower.includes("verify") || actionLower.includes("check")) {
+        type = "verify";
+      }
+      return {
+        type,
+        date: new Date(Number(log.timestamp) || log.createdAt).toISOString(),
+        description: log.description || log.errorMessage || `${String(log.action).replace(/_/g, " ")} by ${log.userEmail || "unknown"}`,
+      };
+    });
   },
   searchLogs: async (
     params?: Record<string, string | number | boolean | undefined>,

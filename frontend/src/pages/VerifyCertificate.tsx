@@ -133,7 +133,6 @@ export default function VerifyCertificate(): JSX.Element {
           qrScannerRef.current = null;
         },
         (error) => {
-          console.log('QR scan error:', error);
         }
       );
     }
@@ -486,7 +485,11 @@ export default function VerifyCertificate(): JSX.Element {
                     onClick={() => {
                       const url = `${window.location.origin}/verify?serial=${encodeURIComponent(serial)}`;
                       navigator.clipboard.writeText(url);
+<<<<<<< HEAD
+                      window.alert('Link copied to clipboard!');
+=======
                       setToast({ message: 'Link copied to clipboard!' });
+>>>>>>> b08cff6a12bc356c3ed3a5b62e725d9a5c8c717b
                     }}
                     className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-slate-800/50 px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-slate-700/50 transition"
                   >

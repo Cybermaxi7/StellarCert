@@ -8,7 +8,9 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   password: process.env.DB_PASSWORD || 'stellarwave_password',
   database: process.env.DB_NAME || 'stellarwave',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  synchronize: process.env.NODE_ENV !== 'production',
+  synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
   autoLoadEntities: true,
+  migrations: [__dirname + '/../migrations/*{.ts,.js}'],
+  migrationsRun: false,
 };

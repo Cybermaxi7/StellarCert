@@ -369,7 +369,7 @@ impl MultisigCertificateContract {
             return false;
         }
 
-        request.status = RequestStatus::Rejected;
+        request.status = RequestStatus::Cancelled;
         env.storage()
             .instance()
             .set(&DataKey::PendingRequest(request_id), &request);

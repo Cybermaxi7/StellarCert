@@ -155,6 +155,7 @@ pub enum RequestStatus {
     Pending,
     Approved,
     Rejected,
+    Cancelled,
     Expired,
     Issued,
 }

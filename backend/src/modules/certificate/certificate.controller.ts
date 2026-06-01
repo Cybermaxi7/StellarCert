@@ -206,6 +206,17 @@ export class CertificateController {
     return this.certificateService.getUserCertificates(userId, +page, +limit);
   }
 
+  @Get('export')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ISSUER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Export certificates' })
+  async exportCertificates(
+    @Query('issuerId') issuerId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.certificateService.exportCertificates(issuerId, status);
+  }
+
   // ─── Single Certificate ───────────────────────────────────────────────────────
 
   @Get(':id/qr')
@@ -355,17 +366,6 @@ export class CertificateController {
       issuerId,
       userRole,
     );
-  }
-
-  @Get('export')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ISSUER, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Export certificates' })
-  async exportCertificates(
-    @Query('issuerId') issuerId?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.certificateService.exportCertificates(issuerId, status);
   }
 
   @Post('export')

@@ -194,7 +194,7 @@ const [templatesError, setTemplatesError] = useState('');
         }
       };
 
-      console.log('Request Payload:', certificateData);
+  
       const res = await createCertificate(certificateData);
 
       if (!res) {

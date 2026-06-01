@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, IntoVal, String, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, IntoVal, String, Vec};
 
 const DEFAULT_UPDATE_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
 
@@ -52,30 +52,31 @@ pub struct CRLContract;
 #[contractimpl]
 impl CRLContract {
     pub fn initialize(env: Env, issuer: Address, certificate_contract: Address) {
-        if env.storage().instance().has(&DataKey::Issuer) {
+        if env.storage().persistent().has(&DataKey::Issuer) {
             panic!("CRL already initialized");
         }
 
         issuer.require_auth();
 
         let now = env.ledger().timestamp();
+        let empty_ids: Vec<String> = Vec::new(&env);
         let crl_info = CRLInfo {
             issuer: issuer.clone(),
             revoked_count: 0,
             crl_number: 1,
             this_update: now,
             next_update: now + DEFAULT_UPDATE_WINDOW_SECONDS,
-            merkle_root: Self::build_merkle_root(&env, 1),
+            merkle_root: Self::build_merkle_root(&env, &empty_ids),
         };
 
-        env.storage().instance().set(&DataKey::Issuer, &issuer);
+        env.storage().persistent().set(&DataKey::Issuer, &issuer);
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::CertContract, &certificate_contract);
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::RevokedCertificates, &Vec::<String>::new(&env));
-        env.storage().instance().set(&DataKey::Info, &crl_info);
+        env.storage().persistent().set(&DataKey::Info, &crl_info);
     }
 
     pub fn revoke_certificate(
@@ -90,7 +91,7 @@ impl CRLContract {
         // Verify the certificate exists in the CertificateContract (#414)
         let cert_contract: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::CertContract)
             .expect("CRL not initialized");
         let cert_exists: bool = env.invoke_contract(
@@ -103,7 +104,7 @@ impl CRLContract {
         }
 
         let revocation_key = DataKey::Revocation(certificate_id.clone());
-        if env.storage().instance().has(&revocation_key) {
+        if env.storage().persistent().has(&revocation_key) {
             panic!("Certificate already revoked");
         }
 
@@ -117,29 +118,29 @@ impl CRLContract {
         };
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&revocation_key, &revocation_info);
 
         let mut revoked_certificates = Self::get_revoked_certificate_ids(&env);
         revoked_certificates.push_back(certificate_id);
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::RevokedCertificates, &revoked_certificates);
 
         crl_info.revoked_count += 1;
-        Self::refresh_crl_info(&env, &mut crl_info);
-        env.storage().instance().set(&DataKey::Info, &crl_info);
+        Self::refresh_crl_info(&env, &mut crl_info, &revoked_certificates);
+        env.storage().persistent().set(&DataKey::Info, &crl_info);
     }
 
     pub fn is_revoked(env: Env, certificate_id: String) -> bool {
         env.storage()
-            .instance()
+            .persistent()
             .has(&DataKey::Revocation(certificate_id))
     }
 
     pub fn get_revocation_info(env: Env, certificate_id: String) -> Option<RevocationInfo> {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Revocation(certificate_id))
     }
 
@@ -171,7 +172,7 @@ impl CRLContract {
             if let Some(certificate_id) = revoked_certificates.get(index) {
                 if let Some(revocation_info) = env
                     .storage()
-                    .instance()
+                    .persistent()
                     .get(&DataKey::Revocation(certificate_id.clone()))
                 {
                     page_of_revocations.push_back(revocation_info);
@@ -187,7 +188,7 @@ impl CRLContract {
         let crl_info = Self::get_crl_info_internal(&env);
         let is_revoked = env
             .storage()
-            .instance()
+            .persistent()
             .has(&DataKey::Revocation(certificate_id));
 
         (is_revoked, crl_info.crl_number)
@@ -206,8 +207,9 @@ impl CRLContract {
             crl_info.next_update = new_next_update;
         }
 
-        Self::refresh_crl_info(&env, &mut crl_info);
-        env.storage().instance().set(&DataKey::Info, &crl_info);
+        let revoked_ids = Self::get_revoked_certificate_ids(&env);
+        Self::refresh_crl_info(&env, &mut crl_info, &revoked_ids);
+        env.storage().persistent().set(&DataKey::Info, &crl_info);
     }
 
     pub fn needs_update(env: Env) -> bool {
@@ -216,36 +218,88 @@ impl CRLContract {
 
     fn get_issuer(env: &Env) -> Address {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Issuer)
             .expect("CRL not initialized")
     }
 
     fn get_crl_info_internal(env: &Env) -> CRLInfo {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Info)
             .expect("CRL info not found")
     }
 
     fn get_revoked_certificate_ids(env: &Env) -> Vec<String> {
-        match env.storage().instance().get(&DataKey::RevokedCertificates) {
+        match env.storage().persistent().get(&DataKey::RevokedCertificates) {
             Some(revoked_certificates) => revoked_certificates,
             None => Vec::new(env),
         }
     }
 
-    fn refresh_crl_info(env: &Env, crl_info: &mut CRLInfo) {
+    fn refresh_crl_info(env: &Env, crl_info: &mut CRLInfo, revoked_ids: &Vec<String>) {
         crl_info.crl_number += 1;
         crl_info.this_update = env.ledger().timestamp();
-        crl_info.merkle_root = Self::build_merkle_root(env, crl_info.crl_number);
+        crl_info.merkle_root = Self::build_merkle_root(env, revoked_ids);
     }
 
-    fn build_merkle_root(env: &Env, crl_number: u64) -> String {
-        if crl_number.is_multiple_of(2) {
-            String::from_str(env, "root-even")
-        } else {
-            String::from_str(env, "root-odd")
+    fn build_merkle_root(env: &Env, revoked_ids: &Vec<String>) -> String {
+        fn sha256_bytes(env: &Env, data: &Bytes) -> BytesN<32> {
+            env.crypto().sha256(data)
         }
+
+        fn pair_hash(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+            let mut combined = [0u8; 64];
+            combined[..32].copy_from_slice(&left.to_array());
+            combined[32..].copy_from_slice(&right.to_array());
+            sha256_bytes(env, &Bytes::from_slice(env, &combined))
+        }
+
+        fn hash_to_hex(env: &Env, hash: &BytesN<32>) -> String {
+            const HEX: &[u8; 16] = b"0123456789abcdef";
+            let arr = hash.to_array();
+            let mut out = [0u8; 64];
+            let mut i = 0usize;
+            while i < 32 {
+                out[i * 2] = HEX[(arr[i] >> 4) as usize];
+                out[i * 2 + 1] = HEX[(arr[i] & 0xf) as usize];
+                i += 1;
+            }
+            // SAFETY: out contains only ASCII hex chars (0-9, a-f)
+            String::from_str(env, unsafe { core::str::from_utf8_unchecked(&out) })
+        }
+
+        if revoked_ids.is_empty() {
+            return hash_to_hex(env, &sha256_bytes(env, &Bytes::new(env)));
+        }
+
+        // Build leaf hashes from certificate IDs
+        let mut layer: Vec<BytesN<32>> = Vec::new(env);
+        for id in revoked_ids.iter() {
+            let len = id.len() as usize;
+            let mut buf = [0u8; 256];
+            id.copy_into_slice(&mut buf[..len]);
+            let id_bytes = Bytes::from_slice(env, &buf[..len]);
+            layer.push_back(sha256_bytes(env, &id_bytes));
+        }
+
+        // Combine pairs up the tree until one root remains
+        while layer.len() > 1 {
+            let mut next: Vec<BytesN<32>> = Vec::new(env);
+            let mut i = 0u32;
+            while i < layer.len() {
+                let left = layer.get_unchecked(i);
+                let right = if i + 1 < layer.len() {
+                    layer.get_unchecked(i + 1)
+                } else {
+                    left.clone() // duplicate odd leaf
+                };
+                next.push_back(pair_hash(env, &left, &right));
+                i += 2;
+            }
+            layer = next;
+        }
+
+        hash_to_hex(env, &layer.get_unchecked(0))
     }
 }

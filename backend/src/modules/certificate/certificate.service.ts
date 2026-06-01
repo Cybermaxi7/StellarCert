@@ -14,11 +14,14 @@ import { RevokeCertificateDto } from './dto/revoke-certificate.dto';
 import { SearchCertificatesDto } from './dto/search-certificates.dto';
 import { Certificate } from './entities/certificate.entity';
 import { Verification } from './entities/verification.entity';
+import { CertificateStatus } from './constants/certificate-status.enum';
+import { User } from '../users/entities/user.entity';
 import { DuplicateDetectionService } from './services/duplicate-detection.service';
 import { DuplicateDetectionConfig } from './interfaces/duplicate-detection.interface';
 import { WebhooksService } from '../webhooks/webhooks.service';
 import { WebhookEvent } from '../webhooks/entities/webhook-subscription.entity';
 import { MetadataSchemaService } from '../metadata-schema/services/metadata-schema.service';
+import { UserRole } from '../users/entities/user.entity';
 
 @Injectable()
 export class CertificateService {
@@ -30,6 +33,8 @@ export class CertificateService {
     private readonly certificateRepository: Repository<Certificate>,
     @InjectRepository(Verification)
     private readonly verificationRepository: Repository<Verification>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly duplicateDetectionService: DuplicateDetectionService,
     private readonly webhooksService: WebhooksService,
     private readonly metadataSchemaService: MetadataSchemaService,
@@ -43,6 +48,17 @@ export class CertificateService {
     ipAddress = 'unknown',
     userAgent = 'unknown',
   ): Promise<Certificate> {
+    // Look up recipientId from email if not provided
+    let recipientId = dto.recipientId;
+    if (!recipientId && dto.recipientEmail) {
+      const user = await this.userRepository.findOne({
+        where: { email: dto.recipientEmail },
+      });
+      if (user) {
+        recipientId = user.id;
+      }
+    }
+
     // Check for duplicates if config is provided
     if (duplicateConfig?.enabled) {
       const duplicateCheck =
@@ -94,6 +110,7 @@ export class CertificateService {
     try {
       const certificate = queryRunner.manager.create(Certificate, {
         ...dto,
+        recipientId,
         expiresAt:
           dto.expiresAt || this.calculateDefaultExpiry(),
         verificationCode:
@@ -255,7 +272,7 @@ export class CertificateService {
   async revoke(id: string, reason?: string): Promise<Certificate> {
     const certificate = await this.findOne(id);
 
-    certificate.status = 'revoked';
+    certificate.status = CertificateStatus.REVOKED;
     if (reason) {
       certificate.metadata = {
         ...certificate.metadata,
@@ -284,13 +301,13 @@ export class CertificateService {
   async freeze(id: string, reason?: string): Promise<Certificate> {
     const certificate = await this.findOne(id);
 
-    if (certificate.status !== 'active') {
+    if (certificate.status !== CertificateStatus.ACTIVE) {
       throw new ConflictException(
         `Certificate must be active to freeze. Current status: ${certificate.status}`,
       );
     }
 
-    certificate.status = 'frozen';
+    certificate.status = CertificateStatus.FROZEN;
     if (reason) {
       certificate.metadata = {
         ...certificate.metadata,
@@ -319,13 +336,13 @@ export class CertificateService {
   async unfreeze(id: string, reason?: string): Promise<Certificate> {
     const certificate = await this.findOne(id);
 
-    if (certificate.status !== 'frozen') {
+    if (certificate.status !== CertificateStatus.FROZEN) {
       throw new ConflictException(
         `Certificate must be frozen to unfreeze. Current status: ${certificate.status}`,
       );
     }
 
-    certificate.status = 'active';
+    certificate.status = CertificateStatus.ACTIVE;
     if (reason) {
       certificate.metadata = {
         ...certificate.metadata,
@@ -365,8 +382,29 @@ export class CertificateService {
 
     for (const id of certificateIds) {
       try {
-        const certificate = await this.revoke(id, reason);
-        revoked.push(certificate);
+        const certificate = await this.findOne(id);
+
+        if (userRole !== UserRole.ADMIN) {
+          if (!issuerId) {
+            failed.push({
+              id,
+              error: 'Issuer identity is required to revoke certificate',
+            });
+            continue;
+          }
+
+          if (certificate.issuerId !== issuerId) {
+            failed.push({
+              id,
+              error:
+                'Unauthorized to revoke certificate issued by another issuer',
+            });
+            continue;
+          }
+        }
+
+        const revokedCertificate = await this.revoke(id, reason);
+        revoked.push(revokedCertificate);
       } catch (error) {
         failed.push({
           id,

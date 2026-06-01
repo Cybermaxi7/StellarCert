@@ -30,7 +30,7 @@ describe('AuditController', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [AuditController],
       providers: [
         {
@@ -46,8 +46,8 @@ describe('AuditController', () => {
       ],
     }).compile();
 
-    controller = module.get<AuditController>(AuditController);
-    service = module.get<AuditService>(AuditService);
+    controller = moduleRef.get<AuditController>(AuditController);
+    service = moduleRef.get<AuditService>(AuditService);
   });
 
   describe('searchLogs', () => {
@@ -241,6 +241,35 @@ describe('AuditController', () => {
 
       expect(service.getResourceAudits).toHaveBeenCalledWith(
         'resource-123',
+        50,
+      );
+    });
+  });
+
+  describe('getCertificateHistory', () => {
+    it('should retrieve certificate history', async () => {
+      jest
+        .spyOn(service, 'getResourceAudits')
+        .mockResolvedValue([mockAuditLog]);
+
+      const result = await controller.getCertificateHistory('cert-123', 50);
+
+      expect(service.getResourceAudits).toHaveBeenCalledWith(
+        'cert-123',
+        50,
+      );
+      expect(result).toEqual([mockAuditLog]);
+    });
+
+    it('should use default limit if not provided', async () => {
+      jest
+        .spyOn(service, 'getResourceAudits')
+        .mockResolvedValue([mockAuditLog]);
+
+      await controller.getCertificateHistory('cert-123');
+
+      expect(service.getResourceAudits).toHaveBeenCalledWith(
+        'cert-123',
         50,
       );
     });

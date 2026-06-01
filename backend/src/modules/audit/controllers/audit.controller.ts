@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuditService } from '../services';
@@ -94,5 +94,19 @@ export class AuditController {
     @Query('limit') limit: number = 50,
   ): Promise<AuditLog[]> {
     return this.auditService.getResourceAudits(resourceId, limit);
+  }
+
+  @Get('certificates/:id/history')
+  @ApiOperation({ summary: 'Get certificate audit history' })
+  @ApiResponse({
+    status: 200,
+    description: 'Certificate history retrieved successfully',
+    type: Array,
+  })
+  async getCertificateHistory(
+    @Param('id') id: string,
+    @Query('limit') limit: number = 50,
+  ): Promise<AuditLog[]> {
+    return this.auditService.getResourceAudits(id, limit);
   }
 }

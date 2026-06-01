@@ -32,40 +32,40 @@ pub struct CertificateContract;
 impl CertificateContract {
     /// Initialize the contract with an admin account
     pub fn initialize(env: Env, admin: Address) {
-        if env.storage().instance().has(&DataKey::Admin) {
+        if env.storage().persistent().has(&DataKey::Admin) {
             panic!("Admin already initialized");
         }
-        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().persistent().set(&DataKey::Admin, &admin);
     }
 
     pub fn add_issuer(env: Env, issuer: Address) {
         let admin: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         admin.require_auth();
 
         let key = DataKey::Issuer(issuer.clone());
-        if !env.storage().instance().has(&key) {
-            let count: u32 = env.storage().instance().get(&DataKey::IssuerCount).unwrap_or(0);
-            env.storage().instance().set(&DataKey::IssuerCount, &(count + 1));
+        if !env.storage().persistent().has(&key) {
+            let count: u32 = env.storage().persistent().get(&DataKey::IssuerCount).unwrap_or(0);
+            env.storage().persistent().set(&DataKey::IssuerCount, &(count + 1));
 
             let mut issuers: Vec<Address> = env
                 .storage()
-                .instance()
+                .persistent()
                 .get(&DataKey::Issuers)
                 .unwrap_or(Vec::new(&env));
             issuers.push_back(issuer.clone());
-            env.storage().instance().set(&DataKey::Issuers, &issuers);
+            env.storage().persistent().set(&DataKey::Issuers, &issuers);
         }
-        env.storage().instance().set(&key, &true);
+        env.storage().persistent().set(&key, &true);
     }
 
     /// Check if an address is an authorized issuer
     pub fn is_issuer(env: Env, address: Address) -> bool {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Issuer(address))
             .unwrap_or(false)
     }
@@ -73,7 +73,7 @@ impl CertificateContract {
     /// Get the total number of authorized issuers
     pub fn get_issuer_count(env: Env) -> u32 {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::IssuerCount)
             .unwrap_or(0)
     }
@@ -81,7 +81,7 @@ impl CertificateContract {
     /// Get the list of all authorized issuers
     pub fn get_issuers(env: Env) -> Vec<Address> {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Issuers)
             .unwrap_or(Vec::new(&env))
     }
@@ -90,11 +90,11 @@ impl CertificateContract {
     pub fn remove_issuer(env: Env, issuer: Address) {
         let admin: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         admin.require_auth();
-        env.storage().instance().remove(&DataKey::Issuer(issuer));
+        env.storage().persistent().remove(&DataKey::Issuer(issuer));
     }
 
     /// Issue a new certificate
@@ -111,7 +111,7 @@ impl CertificateContract {
         // Authorization check
         if !env
             .storage()
-            .instance()
+            .persistent()
             .get::<_, bool>(&DataKey::Issuer(issuer.clone()))
             .unwrap_or(false)
         {
@@ -121,7 +121,7 @@ impl CertificateContract {
         // Uniqueness check
         if env
             .storage()
-            .instance()
+            .persistent()
             .has(&DataKey::Certificate(id.clone()))
         {
             panic!("Certificate with this ID already exists");
@@ -148,7 +148,7 @@ impl CertificateContract {
 
         // Store the certificate
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id.clone()), &cert);
 
         // Track cert ID by issuer and owner
@@ -166,7 +166,7 @@ impl CertificateContract {
     pub fn revoke_certificate(env: Env, id: String, reason: String) {
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(id.clone()))
             .expect("Certificate not found");
         cert.issuer.require_auth();
@@ -178,7 +178,7 @@ impl CertificateContract {
         cert.status = CertificateStatus::Revoked;
         cert.revocation_reason = Some(reason.clone());
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish revocation event
@@ -191,20 +191,20 @@ impl CertificateContract {
     /// Check if a certificate exists
     pub fn certificate_exists(env: Env, id: String) -> bool {
         env.storage()
-            .instance()
+            .persistent()
             .has(&DataKey::Certificate(id))
     }
 
     /// Get certificate details
     pub fn get_certificate(env: Env, id: String) -> Option<Certificate> {
-        env.storage().instance().get(&DataKey::Certificate(id))
+        env.storage().persistent().get(&DataKey::Certificate(id))
     }
 
     /// Suspend a certificate (temporarily disable with reason)
     pub fn suspend_certificate(env: Env, id: String, reason: String) {
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(id.clone()))
             .expect("Certificate not found");
         cert.issuer.require_auth();
@@ -216,7 +216,7 @@ impl CertificateContract {
         cert.status = CertificateStatus::Suspended;
         cert.status_reason = Some(reason);
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish suspension event
@@ -230,7 +230,7 @@ impl CertificateContract {
     pub fn reinstate_certificate(env: Env, id: String, _reason: String) {
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(id.clone()))
             .expect("Certificate not found");
         cert.issuer.require_auth();
@@ -241,7 +241,7 @@ impl CertificateContract {
 
         cert.status = CertificateStatus::Active;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish reinstatement event
@@ -255,7 +255,7 @@ impl CertificateContract {
     pub fn freeze_certificate(env: Env, id: String) {
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(id.clone()))
             .expect("Certificate not found");
         cert.issuer.require_auth();
@@ -266,7 +266,7 @@ impl CertificateContract {
 
         cert.status = CertificateStatus::Frozen;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish freeze event
@@ -280,7 +280,7 @@ impl CertificateContract {
     pub fn unfreeze_certificate(env: Env, id: String) {
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(id.clone()))
             .expect("Certificate not found");
         cert.issuer.require_auth();
@@ -291,7 +291,7 @@ impl CertificateContract {
 
         cert.status = CertificateStatus::Active;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish unfreeze event
@@ -305,7 +305,7 @@ impl CertificateContract {
     pub fn is_valid(env: Env, id: String) -> bool {
         if let Some(cert) = env
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Certificate>(&DataKey::Certificate(id))
         {
             if cert.status != CertificateStatus::Active {
@@ -326,7 +326,7 @@ impl CertificateContract {
     pub fn update_certificate_metadata(env: Env, id: String, new_metadata_uri: String) {
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(id.clone()))
             .expect("Certificate not found");
         cert.issuer.require_auth();
@@ -340,7 +340,7 @@ impl CertificateContract {
         cert.metadata_uri = new_metadata_uri;
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id), &cert);
     }
 
@@ -359,7 +359,7 @@ impl CertificateContract {
         // Verify issuer is authorized
         if !env
             .storage()
-            .instance()
+            .persistent()
             .get::<_, bool>(&DataKey::Issuer(issuer.clone()))
             .unwrap_or(false)
         {
@@ -369,7 +369,7 @@ impl CertificateContract {
         // Get original certificate
         let original_cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(old_id.clone()))
             .expect("Original certificate not found");
 
@@ -381,7 +381,7 @@ impl CertificateContract {
         // Check new ID doesn't exist
         if env
             .storage()
-            .instance()
+            .persistent()
             .has(&DataKey::Certificate(new_id.clone()))
         {
             panic!("Certificate with new ID already exists");
@@ -411,7 +411,7 @@ impl CertificateContract {
 
         // Store new certificate
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(new_id.clone()), &new_cert);
 
         // Emit issuance event
@@ -443,7 +443,7 @@ impl CertificateContract {
         // Get certificate
         let cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(certificate_id.clone()))
             .expect("Certificate not found");
 
@@ -460,7 +460,7 @@ impl CertificateContract {
         // Check if transfer already exists
         if env
             .storage()
-            .instance()
+            .persistent()
             .has(&DataKey::Transfer(transfer_id.clone()))
         {
             panic!("Transfer with this ID already exists");
@@ -483,26 +483,26 @@ impl CertificateContract {
 
         // Store transfer
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Add to certificate's transfer history
         let mut transfers = Self::get_transfer_history(&env, certificate_id.clone());
         transfers.push_back(transfer_id.clone());
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::CertificateTransfers(certificate_id), &transfers);
 
         // Add to pending transfers for new owner
         let mut pending = Self::get_pending_transfers(&env, to_owner.clone());
         pending.push_back(transfer_id.clone());
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingTransfers(to_owner), &pending);
 
         // Increment transfer count
         let count = Self::get_transfer_count(&env);
-        env.storage().instance().set(&DataKey::TransferCount, &(count + 1));
+        env.storage().persistent().set(&DataKey::TransferCount, &(count + 1));
     }
 
     /// Accept a pending certificate transfer
@@ -511,7 +511,7 @@ impl CertificateContract {
 
         let mut transfer: CertificateTransfer = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Transfer(transfer_id.clone()))
             .expect("Transfer not found");
 
@@ -529,7 +529,7 @@ impl CertificateContract {
         transfer.accepted_at = Some(env.ledger().timestamp());
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Remove from pending transfers
@@ -541,7 +541,7 @@ impl CertificateContract {
             }
         }
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingTransfers(to_owner), &updated_pending);
     }
 
@@ -551,7 +551,7 @@ impl CertificateContract {
 
         let mut transfer: CertificateTransfer = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Transfer(transfer_id.clone()))
             .expect("Transfer not found");
 
@@ -568,7 +568,7 @@ impl CertificateContract {
         // Update certificate ownership
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(transfer.certificate_id.clone()))
             .expect("Certificate not found");
 
@@ -581,7 +581,7 @@ impl CertificateContract {
         }
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(transfer.certificate_id.clone()), &cert);
 
         // Update transfer status
@@ -589,7 +589,7 @@ impl CertificateContract {
         transfer.completed_at = Some(env.ledger().timestamp());
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
     }
 
@@ -599,7 +599,7 @@ impl CertificateContract {
 
         let mut transfer: CertificateTransfer = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Transfer(transfer_id.clone()))
             .expect("Transfer not found");
 
@@ -614,7 +614,7 @@ impl CertificateContract {
         transfer.status = TransferStatus::Rejected;
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Remove from pending transfers
@@ -626,7 +626,7 @@ impl CertificateContract {
             }
         }
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingTransfers(to_owner), &updated_pending);
     }
 
@@ -636,7 +636,7 @@ impl CertificateContract {
 
         let mut transfer: CertificateTransfer = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Transfer(transfer_id.clone()))
             .expect("Transfer not found");
 
@@ -651,7 +651,7 @@ impl CertificateContract {
         transfer.status = TransferStatus::Cancelled;
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Remove from pending transfers
@@ -663,14 +663,14 @@ impl CertificateContract {
             }
         }
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingTransfers(transfer.to_owner), &updated_pending);
     }
 
     /// Get transfer history for a certificate
     fn get_transfer_history(env: &Env, certificate_id: String) -> Vec<String> {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::CertificateTransfers(certificate_id))
             .unwrap_or(Vec::<String>::new(env))
     }
@@ -678,7 +678,7 @@ impl CertificateContract {
     /// Get pending transfers for an address
     fn get_pending_transfers(env: &Env, address: Address) -> Vec<String> {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::PendingTransfers(address))
             .unwrap_or(Vec::<String>::new(env))
     }
@@ -686,7 +686,7 @@ impl CertificateContract {
     /// Get total transfer count
     fn get_transfer_count(env: &Env) -> u32 {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::TransferCount)
             .unwrap_or(0)
     }
@@ -694,7 +694,7 @@ impl CertificateContract {
     /// Get transfer details
     pub fn get_transfer(env: Env, transfer_id: String) -> CertificateTransfer {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Transfer(transfer_id))
             .expect("Transfer not found")
     }
@@ -733,7 +733,7 @@ impl CertificateContract {
         {
             panic!("Invalid multisig parameters");
         }
-        env.storage().instance().set(
+        env.storage().persistent().set(
             &DataKey::MultisigConfig(issuer.clone()),
             &MultisigConfig {
                 threshold,
@@ -742,7 +742,7 @@ impl CertificateContract {
             },
         );
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::IssuerAdmin(issuer), &admin);
     }
 
@@ -755,14 +755,14 @@ impl CertificateContract {
     ) {
         let admin: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::IssuerAdmin(issuer.clone()))
             .expect("Issuer admin not found");
         admin.require_auth();
 
         let mut config: MultisigConfig = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::MultisigConfig(issuer.clone()))
             .expect("Multisig config not found");
 
@@ -786,7 +786,7 @@ impl CertificateContract {
         }
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::MultisigConfig(issuer), &config);
     }
 
@@ -800,12 +800,12 @@ impl CertificateContract {
     ) -> PendingRequest {
         let config: MultisigConfig = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::MultisigConfig(issuer.clone()))
             .expect("Issuer does not have multisig configuration");
         if env
             .storage()
-            .instance()
+            .persistent()
             .has(&DataKey::PendingRequest(request_id.clone()))
         {
             panic!("Request already exists");
@@ -826,7 +826,7 @@ impl CertificateContract {
         };
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingRequest(request_id.clone()), &request);
 
         Self::append_request_id(&env, DataKey::IssuerRequestIds(issuer), request_id.clone());
@@ -842,14 +842,14 @@ impl CertificateContract {
         approver.require_auth();
         let mut request: PendingRequest = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::PendingRequest(request_id.clone()))
             .expect("Request not found");
 
         if env.ledger().timestamp() > request.expires_at {
             request.status = RequestStatus::Expired;
             env.storage()
-                .instance()
+                .persistent()
                 .set(&DataKey::PendingRequest(request_id), &request);
             return SignatureResult {
                 success: false,
@@ -868,7 +868,7 @@ impl CertificateContract {
 
         let config: MultisigConfig = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::MultisigConfig(request.issuer.clone()))
             .expect("Config not found");
         if !config.signers.contains(&approver) {
@@ -894,7 +894,7 @@ impl CertificateContract {
         }
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingRequest(request_id), &request);
         SignatureResult {
             success: true,
@@ -912,7 +912,7 @@ impl CertificateContract {
         rejector.require_auth();
         let mut request: PendingRequest = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::PendingRequest(request_id.clone()))
             .expect("Request not found");
 
@@ -926,7 +926,7 @@ impl CertificateContract {
 
         let config: MultisigConfig = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::MultisigConfig(request.issuer.clone()))
             .expect("Config not found");
 
@@ -946,7 +946,7 @@ impl CertificateContract {
         }
 
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingRequest(request_id), &request);
         SignatureResult {
             success: true,
@@ -958,7 +958,7 @@ impl CertificateContract {
     pub fn issue_approved_certificate(env: Env, request_id: String) -> bool {
         let mut request: PendingRequest = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::PendingRequest(request_id.clone()))
             .expect("Request not found");
         if request.status != RequestStatus::Approved {
@@ -977,7 +977,7 @@ impl CertificateContract {
 
         request.status = RequestStatus::Issued;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingRequest(request_id), &request);
         true
     }
@@ -986,7 +986,7 @@ impl CertificateContract {
         // Only the issuer or the contract admin may read the multisig config
         let admin: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         let caller_is_admin = issuer == admin;
@@ -994,7 +994,7 @@ impl CertificateContract {
             issuer.require_auth();
         }
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::MultisigConfig(issuer))
             .expect("Multisig.config not found")
     }
@@ -1003,13 +1003,13 @@ impl CertificateContract {
         caller.require_auth();
         let request: PendingRequest = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::PendingRequest(request_id))
             .expect("Request not found");
         // Only the issuer, proposer, or an authorized signer may read the request
         let admin: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         let is_authorized = caller == request.issuer
@@ -1017,7 +1017,7 @@ impl CertificateContract {
             || caller == admin
             || env
                 .storage()
-                .instance()
+                .persistent()
                 .get::<_, MultisigConfig>(&DataKey::MultisigConfig(request.issuer.clone()))
                 .map(|c| c.signers.contains(&caller))
                 .unwrap_or(false);
@@ -1030,7 +1030,7 @@ impl CertificateContract {
     pub fn is_expired(env: Env, request_id: String) -> bool {
         let request: PendingRequest = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::PendingRequest(request_id))
             .expect("Request not found");
         env.ledger().timestamp() > request.expires_at
@@ -1064,7 +1064,7 @@ impl CertificateContract {
         requester.require_auth();
         let mut request: PendingRequest = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::PendingRequest(request_id.clone()))
             .expect("Request not found");
         if request.proposer != requester {
@@ -1072,7 +1072,7 @@ impl CertificateContract {
         }
         request.status = RequestStatus::Rejected;
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::PendingRequest(request_id), &request);
         true
     }
@@ -1081,7 +1081,7 @@ impl CertificateContract {
     pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
         let admin: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         admin.require_auth();
@@ -1089,12 +1089,12 @@ impl CertificateContract {
         // Bump version counter and record the new wasm hash
         let mut ver: ContractVersion = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::ContractVersion)
             .unwrap_or(ContractVersion { version: 0, last_wasm_hash: new_wasm_hash.clone() });
         ver.version += 1;
         ver.last_wasm_hash = new_wasm_hash.clone();
-        env.storage().instance().set(&DataKey::ContractVersion, &ver);
+        env.storage().persistent().set(&DataKey::ContractVersion, &ver);
 
         env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
@@ -1102,7 +1102,7 @@ impl CertificateContract {
     /// Get the current contract version info
     pub fn get_version(env: Env) -> ContractVersion {
         env.storage()
-            .instance()
+            .persistent()
             .get(&DataKey::ContractVersion)
             .unwrap_or(ContractVersion {
                 version: 0,
@@ -1122,7 +1122,7 @@ impl CertificateContract {
         for id in ids.iter() {
             if let Some(cert) = env
                 .storage()
-                .instance()
+                .persistent()
                 .get::<_, Certificate>(&DataKey::Certificate(id.clone()))
             {
                 let is_expired_by_time = cert
@@ -1170,7 +1170,7 @@ impl CertificateContract {
     pub fn set_certificate_expiry(env: Env, id: String, expiry_time: u64, admin: Address) {
         let stored_admin: Address = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         admin.require_auth();
@@ -1181,13 +1181,13 @@ impl CertificateContract {
 
         let mut cert: Certificate = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::Certificate(id.clone()))
             .expect("Certificate not found");
 
         cert.expires_at = Some(expiry_time);
         env.storage()
-            .instance()
+            .persistent()
             .set(&DataKey::Certificate(id), &cert);
     }
 
@@ -1195,7 +1195,7 @@ impl CertificateContract {
     pub fn get_certificate_expiry(env: Env, id: String) -> Option<u64> {
         if let Some(cert) = env
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Certificate>(&DataKey::Certificate(id))
         {
             cert.expires_at
@@ -1212,7 +1212,7 @@ impl CertificateContract {
     ) -> CertPaginatedResult {
         let ids: Vec<String> = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::IssuerCertIds(issuer))
             .unwrap_or(Vec::<String>::new(&env));
         Self::paginate_certificates(&env, ids, pagination)
@@ -1226,7 +1226,7 @@ impl CertificateContract {
     ) -> CertPaginatedResult {
         let ids: Vec<String> = env
             .storage()
-            .instance()
+            .persistent()
             .get(&DataKey::OwnerCertIds(owner))
             .unwrap_or(Vec::<String>::new(&env));
         Self::paginate_certificates(&env, ids, pagination)
@@ -1257,7 +1257,7 @@ impl CertificateContract {
             if let Some(id) = cert_ids.get(index) {
                 if let Some(cert) = env
                     .storage()
-                    .instance()
+                    .persistent()
                     .get::<_, Certificate>(&DataKey::Certificate(id))
                 {
                     page_data.push_back(cert);
@@ -1278,12 +1278,12 @@ impl CertificateContract {
     fn append_cert_id(env: &Env, key: DataKey, cert_id: String) {
         let mut ids: Vec<String> = env
             .storage()
-            .instance()
+            .persistent()
             .get(&key)
             .unwrap_or(Vec::<String>::new(env));
         if !ids.contains(&cert_id) {
             ids.push_back(cert_id);
-            env.storage().instance().set(&key, &ids);
+            env.storage().persistent().set(&key, &ids);
         }
     }
 
@@ -1292,13 +1292,13 @@ impl CertificateContract {
 
         if !request_ids.contains(&request_id) {
             request_ids.push_back(request_id);
-            env.storage().instance().set(&key, &request_ids);
+            env.storage().persistent().set(&key, &request_ids);
         }
     }
 
     fn get_request_ids(env: &Env, key: DataKey) -> Vec<String> {
         env.storage()
-            .instance()
+            .persistent()
             .get(&key)
             .unwrap_or(Vec::<String>::new(env))
     }
@@ -1313,7 +1313,7 @@ impl CertificateContract {
         for request_id in request_ids.iter() {
             if let Some(request) = env
                 .storage()
-                .instance()
+                .persistent()
                 .get::<_, PendingRequest>(&DataKey::PendingRequest(request_id))
             {
                 if request.status == RequestStatus::Pending {

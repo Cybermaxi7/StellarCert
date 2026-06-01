@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { apiClient, API_URL } from '../api';
+import { tokenStorage } from '../api/tokens';
 
 export type NotificationType = 'info' | 'success' | 'error';
 
@@ -35,9 +36,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const fetchNotifications = async () => {
         try {
-            const token = localStorage.getItem('token');
+            const token = tokenStorage.getAccessToken();
             if (!token) return;
-
             const data = await apiClient<Notification[]>('/notifications');
             setNotifications(data);
         } catch (error) {
@@ -46,33 +46,25 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        const token = tokenStorage.getAccessToken();
         if (!token) return;
 
         fetchNotifications();
 
         const socketUrl = API_URL.replace('/api/v1', '');
-        const newSocket = io(socketUrl, {
-            auth: { token },
-        });
+        const newSocket = io(socketUrl, { auth: { token } });
 
         newSocket.on('newNotification', (notification: Notification) => {
-            setNotifications((prev) => [notification, ...prev]);
+            setNotifications(prev => [notification, ...prev]);
         });
 
-        return () => {
-            newSocket.disconnect();
-        };
+        return () => { newSocket.disconnect(); };
     }, []);
 
     const markAsRead = async (id: string) => {
         try {
-            await apiClient(`/notifications/${id}/read`, {
-                method: 'PATCH',
-            });
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-            );
+            await apiClient(`/notifications/${id}/read`, { method: 'PATCH' });
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
         } catch (error) {
             console.error('Failed to mark as read:', error);
         }
@@ -80,21 +72,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const markAllAsRead = async () => {
         try {
-            await apiClient(`/notifications/read-all`, {
-                method: 'PATCH',
-            });
-            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+            await apiClient(`/notifications/read-all`, { method: 'PATCH' });
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
         } catch (error) {
             console.error('Failed to mark all as read:', error);
         }
     };
 
-    const unreadCount = notifications.filter((n) => !n.isRead).length;
+    const unreadCount = notifications.filter(n => !n.isRead).length;
 
     return (
-        <NotificationContext.Provider
-            value={{ notifications, unreadCount, markAsRead, markAllAsRead, fetchNotifications }}
-        >
+        <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, fetchNotifications }}>
             {children}
         </NotificationContext.Provider>
     );

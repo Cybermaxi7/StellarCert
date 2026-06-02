@@ -639,10 +639,9 @@ export class CertificateService {
     hash: string,
     ipAddress: string,
     userAgent: string,
-  ): Promise<any> {
-    // Placeholder for Stellar verification
+  ): Promise<Certificate> {
     const certificate = await this.certificateRepository.findOne({
-      where: { stellarTxHash: hash } as any,
+      where: { stellarTransactionHash: hash },
     });
     if (!certificate) {
       throw new NotFoundException('Certificate not found for this Stellar transaction');
@@ -680,8 +679,10 @@ export class CertificateService {
   async getStellarTransactionData(id: string): Promise<any> {
     const certificate = await this.findOne(id);
     return {
-      stellarTxHash: (certificate as any).stellarTxHash,
-      stellarNetwork: (certificate as any).stellarNetwork,
+      stellarTransactionHash: certificate.stellarTransactionHash,
+      stellarTransactionId: certificate.stellarTransactionId,
+      stellarMemo: certificate.stellarMemo,
+      stellarSequenceNumber: certificate.stellarSequenceNumber,
       issuedAt: certificate.issuedAt,
     };
   }

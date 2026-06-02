@@ -19,6 +19,8 @@ pub use admin_multisig::*;
 #[cfg(test)]
 mod admin_multisig_test;
 #[cfg(test)]
+mod crl_test;
+#[cfg(test)]
 mod multisig_test;
 #[cfg(test)]
 mod issuer_test;

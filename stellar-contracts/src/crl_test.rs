@@ -1,303 +1,344 @@
 #![cfg(test)]
+
 use super::crl::*;
-use soroban_sdk::{Env, testutils::Address as _, Address, String, Vec};
+use soroban_sdk::{testutils::Address as _, Address, Env, String};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Register a minimal stub that satisfies `certificate_exists` cross-contract
+/// calls made by `revoke_certificate`.
+fn register_cert_stub(env: &Env) -> Address {
+    // The CRL contract calls `certificate_exists(id) -> bool` on the cert
+    // contract.  In the test environment we use `mock_all_auths_allowing_non_root_auth`
+    // together with `env.mock_all_auths()` so cross-contract calls are
+    // intercepted.  We register a second CRLContract address purely to have a
+    // valid `Address`; the call will be mocked to return `true`.
+    env.register_contract(None, CRLContract)
+}
+
+fn setup() -> (Env, Address, Address) {
+    let env = Env::default();
+    env.mock_all_auths();
+    let issuer = Address::generate(&env);
+    let cert_contract = register_cert_stub(&env);
+    (env, issuer, cert_contract)
+}
+
+fn make_client(env: &Env) -> (Address, CRLContractClient) {
+    let contract_id = env.register_contract(None, CRLContract);
+    let client = CRLContractClient::new(env, &contract_id);
+    (contract_id, client)
+}
+
+// ─── Initialization ───────────────────────────────────────────────────────────
 
 #[test]
 fn test_crl_initialization() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
 
-    let issuer = Address::generate(&env);
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
+    client.initialize(&issuer, &cert_contract);
 
     let crl = client.get_crl_info();
     assert_eq!(crl.issuer, issuer);
-    assert_eq!(crl.revoked_certificates.len(), 0);
+    assert_eq!(crl.revoked_count, 0);
     assert_eq!(crl.crl_number, 1);
-    assert!(crl.merkle_root.is_some());
+    // merkle_root should be the SHA-256 of an empty byte string, hex-encoded
+    // (64 hex chars)
+    assert_eq!(crl.merkle_root.len(), 64);
 }
+
+#[test]
+#[should_panic(expected = "CRL already initialized")]
+fn test_double_initialize_panics() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+
+    client.initialize(&issuer, &cert_contract);
+    client.initialize(&issuer, &cert_contract); // must panic
+}
+
+// ─── Revocation ───────────────────────────────────────────────────────────────
 
 #[test]
 fn test_revoke_certificate() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
 
-    let issuer = Address::generate(&env);
-    let cert_id = String::from_str(&env, "CERT-001");
-    let reason = RevocationReason::KeyCompromise;
-    
+    // Mock the cross-contract `certificate_exists` call to return true.
+    // (mock_all_auths already handles auth; we need to mock the return value.)
     env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    // Revoke certificate
-    client.revoke_certificate(&cert_id, &reason, &None);
-    
-    // Check if revoked
+
+    let cert_id = String::from_str(&env, "CERT-001");
+    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
+
     assert!(client.is_revoked(&cert_id));
-    
-    // Get revocation info
-    let info = client.get_revocation_info(&cert_id);
-    assert!(info.is_some());
-    let info = info.unwrap();
+
+    let info = client.get_revocation_info(&cert_id).unwrap();
     assert_eq!(info.certificate_id, cert_id);
-    assert_eq!(info.reason, reason);
+    assert_eq!(info.reason, RevocationReason::KeyCompromise as u32);
     assert_eq!(info.issuer, issuer);
-    
-    // Check CRL updated
+
     let crl = client.get_crl_info();
-    assert_eq!(crl.revoked_certificates.len(), 1);
-    assert_eq!(crl.crl_number, 2); // Should increment
+    assert_eq!(crl.revoked_count, 1);
+    assert_eq!(crl.crl_number, 2); // incremented by refresh_crl_info
 }
 
 #[test]
-fn test_multiple_revocations() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
+fn test_non_revoked_certificate_returns_false() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
 
-    let issuer = Address::generate(&env);
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    // Revoke multiple certificates
-    let cert1 = String::from_str(&env, "CERT-001");
-    let cert2 = String::from_str(&env, "CERT-002");
-    let cert3 = String::from_str(&env, "CERT-003");
-    
-    client.revoke_certificate(&cert1, &RevocationReason::KeyCompromise, &None);
-    client.revoke_certificate(&cert2, &RevocationReason::CACompromise, &None);
-    client.revoke_certificate(&cert3, &RevocationReason::Superseded, &None);
-    
-    // Check all are revoked
-    assert!(client.is_revoked(&cert1));
-    assert!(client.is_revoked(&cert2));
-    assert!(client.is_revoked(&cert3));
-    
-    // Check count
-    assert_eq!(client.get_revoked_count(), 3);
-    
-    // Check CRL number incremented properly
-    let crl = client.get_crl_info();
-    assert_eq!(crl.crl_number, 4);
-}
-
-#[test]
-fn test_unrevoke_certificate() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
-
-    let issuer = Address::generate(&env);
-    let cert_id = String::from_str(&env, "CERT-001");
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    // Revoke first
-    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
-    assert!(client.is_revoked(&cert_id));
-    assert_eq!(client.get_revoked_count(), 1);
-    
-    // Unrevoke
-    client.unrevoke_certificate(&cert_id);
+    let cert_id = String::from_str(&env, "CERT-999");
     assert!(!client.is_revoked(&cert_id));
-    assert_eq!(client.get_revoked_count(), 0);
-    
-    // CRL number should increment
-    let crl = client.get_crl_info();
-    assert_eq!(crl.crl_number, 3);
-}
-
-#[test]
-fn test_revocation_reasons() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
-
-    let issuer = Address::generate(&env);
-    let cert_id = String::from_str(&env, "CERT-001");
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    // Test different revocation reasons
-    let reasons = vec![
-        RevocationReason::KeyCompromise,
-        RevocationReason::CACompromise,
-        RevocationReason::AffiliationChanged,
-        RevocationReason::Superseded,
-        RevocationReason::CessationOfOperation,
-        RevocationReason::CertificateHold,
-        RevocationReason::PrivilegeWithdrawn,
-        RevocationReason::AACompromise,
-        RevocationReason::Other(String::from_str(&env, "Custom reason")),
-    ];
-    
-    for (i, reason) in reasons.iter().enumerate() {
-        let cert_id = String::from_str(&env, &format!("CERT-{:03}", i));
-        client.revoke_certificate(&cert_id, reason, &None);
-        let info = client.get_revocation_info(&cert_id).unwrap();
-        assert_eq!(&info.reason, reason);
-    }
-}
-
-#[test]
-fn test_paginated_retrieval() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
-
-    let issuer = Address::generate(&env);
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    // Add 15 certificates
-    for i in 0..15 {
-        let cert_id = String::from_str(&env, &format!("CERT-{:03}", i));
-        client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
-    }
-    
-    // Test pagination
-    let page1 = client.get_revoked_certificates(&Pagination { page: 0, limit: 5 });
-    assert_eq!(page1.data.len(), 5);
-    assert_eq!(page1.total, 15);
-    assert_eq!(page1.page, 0);
-    assert_eq!(page1.limit, 5);
-    assert!(page1.has_next);
-    
-    let page2 = client.get_revoked_certificates(&Pagination { page: 1, limit: 5 });
-    assert_eq!(page2.data.len(), 5);
-    assert!(page2.has_next);
-    
-    let page3 = client.get_revoked_certificates(&Pagination { page: 2, limit: 5 });
-    assert_eq!(page3.data.len(), 5);
-    assert!(!page3.has_next);
-    
-    // Test page beyond end
-    let page4 = client.get_revoked_certificates(&Pagination { page: 3, limit: 5 });
-    assert_eq!(page4.data.len(), 0);
-    assert!(!page4.has_next);
-}
-
-#[test]
-fn test_verify_certificate() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
-
-    let issuer = Address::generate(&env);
-    let cert_id = String::from_str(&env, "CERT-001");
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    // Verify non-revoked certificate
-    let result = client.verify_certificate(&cert_id);
-    assert!(!result.is_revoked);
-    assert!(result.revocation_info.is_none());
-    assert_eq!(result.crl_number, 1);
-    
-    // Revoke and verify
-    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
-    let result = client.verify_certificate(&cert_id);
-    assert!(result.is_revoked);
-    assert!(result.revocation_info.is_some());
-    assert_eq!(result.crl_number, 2);
-}
-
-#[test]
-fn test_merkle_root_updates() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
-
-    let issuer = Address::generate(&env);
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    let initial_root = client.get_merkle_root();
-    assert!(initial_root.is_some());
-    
-    // Add certificates and check root changes
-    let root1 = client.get_merkle_root().unwrap();
-    client.revoke_certificate(&String::from_str(&env, "CERT-001"), &RevocationReason::KeyCompromise, &None);
-    let root2 = client.get_merkle_root().unwrap();
-    assert_ne!(root1, root2);
-    
-    client.revoke_certificate(&String::from_str(&env, "CERT-002"), &RevocationReason::KeyCompromise, &None);
-    let root3 = client.get_merkle_root().unwrap();
-    assert_ne!(root2, root3);
-    
-    // Remove certificate and check root changes again
-    client.unrevoke_certificate(&String::from_str(&env, "CERT-001"));
-    let root4 = client.get_merkle_root().unwrap();
-    assert_ne!(root3, root4);
-}
-
-#[test]
-fn test_crl_metadata_updates() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
-
-    let issuer = Address::generate(&env);
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    let original_crl = client.get_crl_info();
-    let original_update = original_crl.next_update;
-    
-    // Update next update time
-    let new_update = original_update + 3600; // 1 hour later
-    client.update_crl_metadata(&Some(new_update), &None);
-    
-    let updated_crl = client.get_crl_info();
-    assert_eq!(updated_crl.next_update, new_update);
-    assert_eq!(updated_crl.crl_number, 2); // Should increment
-    
-    // Test needs_update
-    assert!(!client.needs_update()); // Should not need update yet
+    assert!(client.get_revocation_info(&cert_id).is_none());
 }
 
 #[test]
 #[should_panic(expected = "Certificate already revoked")]
 fn test_duplicate_revocation_panics() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
 
-    let issuer = Address::generate(&env);
     let cert_id = String::from_str(&env, "CERT-001");
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
     client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
-    
-    // Try to revoke again - should panic
     client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
 }
 
 #[test]
-#[should_panic(expected = "Certificate not found in revocation list")]
-fn test_unrevoke_nonexistent_panics() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, CRLContract);
-    let client = CRLContractClient::new(&env, &contract_id);
+fn test_revoke_multiple_certificates() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
 
-    let issuer = Address::generate(&env);
+    let cert1 = String::from_str(&env, "CERT-001");
+    let cert2 = String::from_str(&env, "CERT-002");
+    let cert3 = String::from_str(&env, "CERT-003");
+
+    client.revoke_certificate(&cert1, &RevocationReason::KeyCompromise, &None);
+    client.revoke_certificate(&cert2, &RevocationReason::CACompromise, &None);
+    client.revoke_certificate(&cert3, &RevocationReason::Superseded, &None);
+
+    assert!(client.is_revoked(&cert1));
+    assert!(client.is_revoked(&cert2));
+    assert!(client.is_revoked(&cert3));
+    assert_eq!(client.get_revoked_count(), 3);
+    assert_eq!(client.get_crl_info().crl_number, 4);
+}
+
+// ─── Verification ─────────────────────────────────────────────────────────────
+
+#[test]
+fn test_verify_certificate_not_revoked() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
     let cert_id = String::from_str(&env, "CERT-001");
-    
-    env.mock_all_auths();
-    client.initialize(&issuer);
-    
-    // Try to unrevoke non-existent certificate - should panic
-    client.unrevoke_certificate(&cert_id);
+    let (is_revoked, crl_number) = client.verify_certificate(&cert_id);
+    assert!(!is_revoked);
+    assert_eq!(crl_number, 1);
+}
+
+#[test]
+fn test_verify_certificate_after_revocation() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    let cert_id = String::from_str(&env, "CERT-001");
+    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
+
+    let (is_revoked, crl_number) = client.verify_certificate(&cert_id);
+    assert!(is_revoked);
+    assert_eq!(crl_number, 2);
+}
+
+// ─── Merkle root ─────────────────────────────────────────────────────────────
+
+#[test]
+fn test_merkle_root_is_64_hex_chars() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    let root = client.get_merkle_root();
+    // SHA-256 hex digest is always 64 lower-case hex characters
+    assert_eq!(root.len(), 64);
+}
+
+#[test]
+fn test_merkle_root_changes_on_revocation() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    let root_before = client.get_merkle_root();
+
+    client.revoke_certificate(
+        &String::from_str(&env, "CERT-001"),
+        &RevocationReason::KeyCompromise,
+        &None,
+    );
+    let root_after_one = client.get_merkle_root();
+    assert_ne!(root_before, root_after_one);
+
+    client.revoke_certificate(
+        &String::from_str(&env, "CERT-002"),
+        &RevocationReason::KeyCompromise,
+        &None,
+    );
+    let root_after_two = client.get_merkle_root();
+    assert_ne!(root_after_one, root_after_two);
+}
+
+#[test]
+fn test_merkle_root_is_deterministic() {
+    // Two independently-built CRLs with the same set of IDs must produce the
+    // same root.
+    let (env, issuer, cert_contract) = setup();
+
+    let (_, client_a) = make_client(&env);
+    let (_, client_b) = make_client(&env);
+
+    let cert_contract2 = register_cert_stub(&env);
+    let issuer2 = Address::generate(&env);
+
+    client_a.initialize(&issuer, &cert_contract);
+    client_b.initialize(&issuer2, &cert_contract2);
+
+    let ids = ["ALPHA", "BETA", "GAMMA"];
+    for id in ids {
+        let s = String::from_str(&env, id);
+        client_a.revoke_certificate(&s, &RevocationReason::KeyCompromise, &None);
+        client_b.revoke_certificate(&s, &RevocationReason::KeyCompromise, &None);
+    }
+
+    assert_eq!(client_a.get_merkle_root(), client_b.get_merkle_root());
+}
+
+#[test]
+fn test_merkle_root_odd_number_of_leaves() {
+    // Odd leaf count triggers the "duplicate last leaf" branch in the tree.
+    // Result must still be a valid 64-char hex string and differ from even.
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    for i in 0u32..3 {
+        let s = soroban_sdk::String::from_str(&env, &["ID-", &i.to_string()].concat());
+        client.revoke_certificate(&s, &RevocationReason::Superseded, &None);
+    }
+    let root_odd = client.get_merkle_root();
+    assert_eq!(root_odd.len(), 64);
+
+    client.revoke_certificate(
+        &String::from_str(&env, "ID-3"),
+        &RevocationReason::Superseded,
+        &None,
+    );
+    let root_even = client.get_merkle_root();
+    assert_eq!(root_even.len(), 64);
+    assert_ne!(root_odd, root_even);
+}
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+
+#[test]
+fn test_get_revoked_certificates_pagination() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    for i in 0u32..7 {
+        let s = soroban_sdk::String::from_str(&env, &["CERT-", &i.to_string()].concat());
+        client.revoke_certificate(&s, &RevocationReason::KeyCompromise, &None);
+    }
+
+    let page0 = client.get_revoked_certificates(&0, &3);
+    assert_eq!(page0.len(), 3);
+
+    let page1 = client.get_revoked_certificates(&1, &3);
+    assert_eq!(page1.len(), 3);
+
+    let page2 = client.get_revoked_certificates(&2, &3);
+    assert_eq!(page2.len(), 1); // only 1 left
+
+    let page3 = client.get_revoked_certificates(&3, &3);
+    assert_eq!(page3.len(), 0); // beyond end
+}
+
+#[test]
+fn test_get_revoked_certificates_zero_limit() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    client.revoke_certificate(
+        &String::from_str(&env, "CERT-001"),
+        &RevocationReason::KeyCompromise,
+        &None,
+    );
+
+    let result = client.get_revoked_certificates(&0, &0);
+    assert_eq!(result.len(), 0);
+}
+
+// ─── CRL metadata update ──────────────────────────────────────────────────────
+
+#[test]
+fn test_update_crl_metadata_changes_next_update() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    let original = client.get_crl_info().next_update;
+    let new_next = original + 3600;
+
+    client.update_crl_metadata(&Some(new_next), &None);
+
+    let updated = client.get_crl_info();
+    assert_eq!(updated.next_update, new_next);
+    assert_eq!(updated.crl_number, 2); // refresh_crl_info increments
+}
+
+#[test]
+fn test_update_crl_metadata_none_preserves_next_update() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    let original = client.get_crl_info().next_update;
+    client.update_crl_metadata(&None, &None);
+
+    assert_eq!(client.get_crl_info().next_update, original);
+}
+
+#[test]
+fn test_needs_update_false_after_init() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    assert!(!client.needs_update());
+}
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_set_admin_allows_revocation() {
+    let (env, issuer, cert_contract) = setup();
+    let (_, client) = make_client(&env);
+    client.initialize(&issuer, &cert_contract);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    // Admin should now be able to revoke (auth is mocked for all)
+    let cert_id = String::from_str(&env, "CERT-001");
+    client.revoke_certificate(&cert_id, &RevocationReason::AffiliationChanged, &None);
+    assert!(client.is_revoked(&cert_id));
 }

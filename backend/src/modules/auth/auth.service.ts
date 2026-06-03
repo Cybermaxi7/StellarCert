@@ -68,10 +68,18 @@ export class AuthService {
     }
 
     const payload = { email: user.email, sub: user.id, role: user.role };
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = await this.jwtManagementService.generateAccessToken(payload);
+    const refreshToken = await this.jwtManagementService.generateRefreshToken(payload);
+
+    // Update the refresh token in the database
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
+    await this.userRepository.update(user.id, {
+      refreshToken: hashedRefreshToken,
+    });
 
     return {
       accessToken,
+      refreshToken,
       expiresIn: 3600,
       user: {
         id: user.id,
@@ -104,14 +112,23 @@ export class AuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    const accessToken = this.jwtService.sign({
+    const payloadForToken = {
       email: user.email,
       sub: user.id,
       role: user.role,
+    };
+    const accessToken = await this.jwtManagementService.generateAccessToken(payloadForToken);
+    const refreshToken = await this.jwtManagementService.generateRefreshToken(payloadForToken);
+
+    // Update the refresh token in the database
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 12);
+    await this.userRepository.update(user.id, {
+      refreshToken: hashedRefreshToken,
     });
 
     return {
       accessToken,
+      refreshToken,
       expiresIn: 3600,
       user: {
         id: user.id,

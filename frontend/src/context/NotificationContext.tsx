@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { apiClient, API_URL } from '../api';
 import { tokenStorage } from '../api/tokens';
+import { useAuth } from './AuthContext';
 
 export type NotificationType = 'info' | 'success' | 'error';
 
@@ -33,6 +34,8 @@ export const useNotifications = () => {
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const socketRef = useRef<Socket | null>(null);
+    const { isAuthenticated } = useAuth();
 
     const fetchNotifications = async () => {
         try {
@@ -45,21 +48,52 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     };
 
+    // Effect to handle socket connection when user authenticates
     useEffect(() => {
         const token = tokenStorage.getAccessToken();
-        if (!token) return;
+
+        // If no token, disconnect socket if it exists
+        if (!token) {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+            return;
+        }
+
+        // Prevent creating duplicate sockets
+        if (socketRef.current?.connected) {
+            return;
+        }
 
         fetchNotifications();
 
         const socketUrl = API_URL.replace('/api/v1', '');
-        const newSocket = io(socketUrl, { auth: { token } });
+        const newSocket = io(socketUrl, {
+            auth: { token },
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: 5,
+        });
 
         newSocket.on('newNotification', (notification: Notification) => {
             setNotifications(prev => [notification, ...prev]);
         });
 
-        return () => { newSocket.disconnect(); };
-    }, []);
+        newSocket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+        });
+
+        socketRef.current = newSocket;
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, [isAuthenticated]);
 
     const markAsRead = async (id: string) => {
         try {

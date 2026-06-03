@@ -107,6 +107,7 @@ export class Certificate {
   stellarTransactionId?: string;
 
   @Column({ nullable: true, unique: true })
+  @Index()
   stellarTransactionHash?: string;
 
   @Column({ type: 'text', nullable: true })

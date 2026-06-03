@@ -21,6 +21,8 @@ pub use admin_multisig::*;
 #[cfg(test)]
 mod admin_multisig_test;
 #[cfg(test)]
+mod crl_test;
+#[cfg(test)]
 mod multisig_test;
 #[cfg(test)]
 mod issuer_test;
@@ -96,7 +98,39 @@ impl CertificateContract {
             .get(&DataKey::Admin)
             .expect("Contract not initialized");
         admin.require_auth();
-        env.storage().persistent().remove(&DataKey::Issuer(issuer));
+
+        let key = DataKey::Issuer(issuer.clone());
+
+        // Only update the Vec and counter when the issuer was actually present.
+        if env.storage().persistent().has(&key) {
+            // Decrement the count (saturating so it never wraps below zero).
+            let count: u32 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::IssuerCount)
+                .unwrap_or(0);
+            env.storage()
+                .persistent()
+                .set(&DataKey::IssuerCount, &count.saturating_sub(1));
+
+            // Rebuild the Issuers vec without the removed address.
+            let issuers: Vec<Address> = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Issuers)
+                .unwrap_or(Vec::new(&env));
+            let mut updated = Vec::new(&env);
+            for addr in issuers.iter() {
+                if addr != issuer {
+                    updated.push_back(addr);
+                }
+            }
+            env.storage()
+                .persistent()
+                .set(&DataKey::Issuers, &updated);
+
+            env.storage().persistent().remove(&key);
+        }
     }
 
     /// Issue a new certificate

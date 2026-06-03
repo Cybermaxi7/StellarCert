@@ -62,10 +62,10 @@ function App() {
                   element={
                     <ProtectedRoute
                       allowedRoles={[
-                        "recipient",
-                        "verifier",
-                        "issuer",
-                        "admin",
+                        UserRole.RECIPIENT,
+                        UserRole.VERIFIER,
+                        UserRole.ISSUER,
+                        UserRole.ADMIN,
                       ]}
                     />
                   }

@@ -29,7 +29,7 @@ import {
   ResetPasswordRequest,
   VerifyEmailRequest,
 } from "./types";
-import { tokenStorage } from "./tokens";
+import { tokenStorage, notifyTokenRefreshed } from "./tokens";
 
 interface AuditLogQueryParams {
   action?: string;
@@ -150,7 +150,10 @@ export async function apiClient<T>(
           try {
             const refreshResponse = await refreshTokens();
             tokenStorage.setAccessToken(refreshResponse.accessToken);
-            tokenStorage.setRefreshToken(refreshResponse.refreshToken);
+            if (refreshResponse.refreshToken) {
+              tokenStorage.setRefreshToken(refreshResponse.refreshToken);
+            }
+            notifyTokenRefreshed(refreshResponse.accessToken);
             // Retry the original request with hasTriedRefresh = true
             return attemptRequest(attempt, true);
           } catch (refreshError) {
@@ -169,7 +172,12 @@ export async function apiClient<T>(
         return {} as T;
       }
 
-      return await response.json();
+      const json = await response.json();
+      // Unwrap the global ResponseInterceptor envelope { statusCode, message, data }
+      if (json && typeof json === 'object' && 'data' in json && 'statusCode' in json) {
+        return json.data as T;
+      }
+      return json as T;
     } catch (error) {
       // Don't retry if this is the last attempt or retry condition is not met
       if (attempt >= config.maxRetries || !config.retryCondition?.(error)) {
@@ -403,7 +411,7 @@ export const verifyCertificate = async (
 
   try {
     return await apiClient<VerificationResult>(
-      `/certificates/${serialNumber}/verify`,
+      `/certificates/verify/${serialNumber}`,
     );
   } catch (error) {
     return handleError(error, "verifyCertificate");
@@ -436,9 +444,22 @@ export const createCertificate = async (
   }
 
   try {
+    const payload = {
+      issuerId: data.issuerId,
+      recipientId: data.recipientId || undefined,
+      recipientEmail: data.recipientEmail,
+      recipientName: data.recipientName,
+      title: data.title,
+      description: data.description || undefined,
+      courseName: data.courseName || undefined,
+      issuerName: data.issuerName || undefined,
+      expiresAt: data.expiryDate || undefined,
+      templateId: data.templateId || undefined,
+      metadata: data.metadata || undefined,
+    };
     return await apiClient<Certificate>("/certificates", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
   } catch (error) {
     return handleError(error, "createCertificate");
@@ -523,7 +544,11 @@ export const getUserCertificates = async (
   }
 
   try {
-    return await apiClient<Certificate[]>(`/certificates/user/${userId}`);
+    const result = await apiClient<Certificate[] | { certificates: Certificate[]; total: number } | PaginatedResponse<Certificate>>(`/certificates/user/${userId}`);
+    if (Array.isArray(result)) return result;
+    if ('data' in result) return (result as PaginatedResponse<Certificate>).data;
+    if ('certificates' in result) return (result as { certificates: Certificate[] }).certificates;
+    return [];
   } catch (error) {
     return handleError(error, "getUserCertificates");
   }
@@ -775,8 +800,8 @@ export const certificateApi = {
     }
 
     return apiClient<Certificate>(`/certificates/${certificateId}/freeze`, {
-      method: "POST",
-      body: JSON.stringify({ reason, durationDays }),
+      method: "PATCH",
+      body: JSON.stringify({ reason }),
     });
   },
   unfreeze: async (certificateId: string): Promise<Certificate> => {
@@ -795,7 +820,7 @@ export const certificateApi = {
     }
 
     return apiClient<Certificate>(`/certificates/${certificateId}/unfreeze`, {
-      method: "POST",
+      method: "PATCH",
     });
   },
   getQR: getCertificateQR,
@@ -850,10 +875,13 @@ export const loginApi = async (
   try {
     const response = await apiClient<AuthResponse>("/auth/login", {
       method: "POST",
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ email: credentials.email, password: credentials.password }),
+      skipAuth: true,
     });
     tokenStorage.setAccessToken(response.accessToken);
-    // Note: refreshToken is handled server-side via httpOnly cookies
+    if (response.refreshToken) {
+      tokenStorage.setRefreshToken(response.refreshToken);
+    }
     return response;
   } catch (error) {
     return handleError(error, "loginApi");
@@ -867,7 +895,10 @@ export const registerApi = async (
     await simulateDelay();
     const newUser: User = {
       id: `user-${Date.now()}`,
-      ...data,
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: UserRole.USER,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -885,10 +916,22 @@ export const registerApi = async (
   try {
     const response = await apiClient<AuthResponse>("/auth/register", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+      }),
+      skipAuth: true,
     });
-    tokenStorage.setAccessToken(response.accessToken);
-    // Note: refreshToken is handled server-side via httpOnly cookies
+    // Registration requires email verification before login is allowed.
+    // Store tokens so the UI can show the "check your email" state.
+    if (response.accessToken) {
+      tokenStorage.setAccessToken(response.accessToken);
+    }
+    if (response.refreshToken) {
+      tokenStorage.setRefreshToken(response.refreshToken);
+    }
     return response;
   } catch (error) {
     return handleError(error, "registerApi");
@@ -912,7 +955,11 @@ export const authApi = {
   logout: async (): Promise<void> => {
     try {
       if (!USE_DUMMY_DATA) {
-        await apiClient("/auth/logout", { method: "POST" });
+        const accessToken = tokenStorage.getAccessToken();
+        await apiClient("/auth/logout", {
+          method: "POST",
+          body: JSON.stringify({ accessToken: accessToken ?? '' }),
+        });
       }
     } finally {
       tokenStorage.clearTokens();
@@ -936,6 +983,14 @@ export const authApi = {
     return apiClient("/users/verify-email", {
       method: "POST",
       body: JSON.stringify(data),
+      skipAuth: true,
+    });
+  },
+  resendVerification: async (email: string): Promise<{ message: string }> => {
+    return apiClient("/users/resend-verification", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      skipAuth: true,
     });
   },
 };

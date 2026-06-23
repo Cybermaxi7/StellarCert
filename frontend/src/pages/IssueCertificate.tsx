@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Award, Eye, Layout, XCircle } from 'lucide-react';
+import { Award, CheckCircle, Eye, Layout, XCircle } from 'lucide-react';
 import { createCertificate, fetchDefaultTemplate, fetchUserByEmail, templateApi, CertificateTemplate } from '../api';
 import CertificatePreviewModal, { CertificatePreviewData } from '../components/CertificatePreviewModal';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +31,7 @@ const IssueCertificate = () => {
     issuerName: '', grade: '', issueDate: '', expiryDate: '', templateId: '',
   };
   const [error, setError] = useState('');
+  const [successId, setSuccessId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
@@ -108,25 +109,33 @@ const IssueCertificate = () => {
     try {
       if (!user) { setError('You must be logged in to issue a certificate.'); return; }
       setIsSubmitting(true); setError('');
-      const recipient = await fetchUserByEmail(formData.recipientEmail);
-      const templateId = formData.templateId || (await fetchDefaultTemplate())?.id;
-      if (!recipient) { setError('Failed to fetch recipient details. Please Recheck Email'); return; }
-      if (!templateId) { setError('Please select a template.'); return; }
+
+      // Recipient registration is optional — look them up but don't block if not found
+      const [recipient, resolvedTemplateId] = await Promise.all([
+        fetchUserByEmail(formData.recipientEmail).catch(() => null),
+        formData.templateId ? Promise.resolve(formData.templateId) : fetchDefaultTemplate().then(t => t?.id ?? ''),
+      ]);
+
+      if (!resolvedTemplateId) { setError('Please select a template.'); return; }
+
       const res = await createCertificate({
         title: `${formData.courseName} Certificate`,
         description: `This certificate is awarded for completing the ${formData.courseName} course`,
         courseName: formData.courseName, issuerName: formData.issuerName,
         recipientName: formData.recipientName, recipientEmail: formData.recipientEmail,
         issueDate: formData.issueDate, expiryDate: formData.expiryDate || undefined,
-        issuerId: user.id, recipientId: recipient.id, templateId,
+        issuerId: user.id, recipientId: recipient?.id || undefined,
+        templateId: resolvedTemplateId,
         metadata: { grade: formData.grade, courseName: formData.courseName },
       });
+
       if (!res) { setError('Failed to create Certificate'); return; }
       setIsPreviewOpen(false);
+      setSuccessId(res.id);
       setFormData({ ...initialFormData, issuerName: formData.issuerName, templateId: formData.templateId });
-      setError('');
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Failed to issue certificate');
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message ?? 'Failed to issue certificate';
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -138,6 +147,16 @@ const IssueCertificate = () => {
         <Award className="w-10 h-10 text-blue-600" />
         <h1 className="text-3xl font-bold">Issue Certificate</h1>
       </div>
+      {successId && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4">
+          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-green-800 dark:text-green-300">Certificate issued successfully!</p>
+            <p className="text-sm text-green-700 dark:text-green-400 mt-1">Certificate ID: <span className="font-mono">{successId}</span></p>
+            <button onClick={() => setSuccessId(null)} className="mt-2 text-sm text-green-600 dark:text-green-400 underline hover:no-underline">Dismiss</button>
+          </div>
+        </div>
+      )}
       <div className="bg-white rounded-lg shadow-md p-6">
         <form onSubmit={handleOpenPreview} className="space-y-6">
           {/* Certificate Template - single instance with loading/error guards */}

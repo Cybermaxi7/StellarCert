@@ -5,7 +5,10 @@ import { NextFunction, Request, Response } from 'express';
 export class InputSanitizationMiddleware implements NestMiddleware {
   use(req: Request, _res: Response, next: NextFunction): void {
     req.body = this.sanitize(req.body);
-    req.query = this.sanitize(req.query) as Request['query'];
+    const sanitizedQuery = this.sanitize(req.query) as Record<string, unknown>;
+    for (const key of Object.keys(sanitizedQuery)) {
+      (req.query as Record<string, unknown>)[key] = sanitizedQuery[key];
+    }
     req.params = this.sanitize(req.params);
 
     next();

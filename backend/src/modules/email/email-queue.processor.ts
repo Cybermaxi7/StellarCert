@@ -5,8 +5,7 @@ import { EmailService } from './email.service';
 import { SendEmailDto } from './dto/send-email.dto';
 import { LoggingService } from "../../common/logging/logging.service";
 
-export const EMAIL_QUEUE_NAME =
-  'stellar-email-queue-' + Math.random().toString(36).substring(7);
+export const EMAIL_QUEUE_NAME = 'stellar-email-queue';
 
 export enum EmailJobType {
   SEND_EMAIL = 'send-email',

@@ -41,6 +41,7 @@ import { SearchCertificatesDto } from './dto/search-certificates.dto';
 import { UpdateCertificateDto } from './dto/update-certificate.dto';
 import { CreateCertificateDto } from './dto/create-certificate.dto';
 import { CacheInterceptor } from '../../common/interceptors/cache.interceptor';
+import { CertificateMapper } from './mappers/certificate.mapper';
 
 interface AuthenticatedUser {
   id: string;
@@ -59,6 +60,7 @@ export class CertificateController {
     private readonly certificateService: CertificateService,
     private readonly statsService: CertificateStatsService,
     private readonly pdfService: CertificatePdfService,
+    private readonly mapper: CertificateMapper,
   ) {}
 
   // ─── List / Search ──────────────────────────────────────────────────────────
@@ -77,7 +79,19 @@ export class CertificateController {
     @Query('issuerId') issuerId?: string,
     @Query('status') status?: string,
   ) {
-    return this.certificateService.findAll(+page, +limit, issuerId, status);
+    const pageNum = +page;
+    const limitNum = +limit;
+    const result = await this.certificateService.findAll(pageNum, limitNum, issuerId, status);
+    // Service returns { certificates, total }; normalize to { data, total, page, limit, totalPages }
+    const certs: any[] = (result as any).certificates ?? (result as any).data ?? (Array.isArray(result) ? result : []);
+    const total: number = (result as any).total ?? certs.length;
+    return {
+      data: certs.map((c: any) => this.mapper.toResponse(c)),
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+    };
   }
 
   @Get('search')
@@ -128,12 +142,17 @@ export class CertificateController {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
     const userAgent = req.headers['user-agent'] ?? 'unknown';
-    return this.certificateService.verifyByCode(
-      code,
-      verifiedBy ?? 'public',
-      ipAddress,
-      userAgent,
-    );
+    try {
+      const cert = await this.certificateService.verifyByCode(
+        code,
+        verifiedBy ?? 'public',
+        ipAddress,
+        userAgent,
+      );
+      return this.mapper.toVerificationResult(cert as any, code);
+    } catch {
+      return this.mapper.toVerificationResult(null, code);
+    }
   }
 
   @Get('verify/stellar/:hash')
@@ -254,7 +273,8 @@ export class CertificateController {
   @ApiOperation({ summary: 'Get certificate details by ID' })
   @ApiParam({ name: 'id', description: 'Certificate UUID' })
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.certificateService.findOne(id);
+    const cert = await this.certificateService.findOne(id);
+    return this.mapper.toResponse(cert);
   }
 
   @Get(':id/stellar')
@@ -299,7 +319,8 @@ export class CertificateController {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
     const userAgent = req.headers['user-agent'] ?? 'unknown';
-    return this.certificateService.issue(dto, user.id, ipAddress, userAgent);
+    const cert = await this.certificateService.issue(dto, user.id, ipAddress, userAgent);
+    return this.mapper.toResponse(cert);
   }
 
   // ─── Update ───────────────────────────────────────────────────────────────────

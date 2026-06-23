@@ -16,6 +16,6 @@ import { CleanupService } from './services/cleanup.service';
     QrCodeService,
     CleanupService,
   ],
-  exports: [FilesService],
+  exports: [FilesService, StorageService, PdfService, QrCodeService],
 })
 export class FilesModule {}

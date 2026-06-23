@@ -54,10 +54,6 @@ export class AuthService {
       throw new ForbiddenException('Account is deactivated');
     }
 
-    if (!user.emailVerified) {
-      throw new ForbiddenException('Email not verified');
-    }
-
     // If 2FA is enabled, issue a short-lived pre-auth token instead of a full access token
     if (user.twoFactorEnabled) {
       const preAuthToken = this.jwtService.sign(
@@ -86,6 +82,8 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified ?? user.emailVerified ?? false,
       },
     };
   }
@@ -135,6 +133,8 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified ?? false,
       },
     };
   }
@@ -155,11 +155,14 @@ export class AuthService {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       expiresIn: tokens.expiresIn,
+      requiresEmailVerification: !user.isEmailVerified,
       user: {
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified ?? false,
       },
     };
   }
@@ -222,6 +225,8 @@ export class AuthService {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: user.role,
+          isEmailVerified: user.isEmailVerified ?? false,
         },
       };
     } catch (error) {

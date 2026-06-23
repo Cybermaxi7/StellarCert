@@ -5,10 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  JoinColumn,
   Index,
 } from 'typeorm';
 
-import { Issuer } from '../../issuers/entities/issuer.entity';
+import { User } from '../../users/entities/user.entity';
 import { CertificateStatus } from '../constants/certificate-status.enum';
 
 export interface VerificationHistoryRecord {
@@ -158,8 +159,9 @@ export class Certificate {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToOne(() => Issuer)
-  issuer: Issuer;
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'issuerId' })
+  issuer: User;
 
   // ─── Business logic helpers ──────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuditLog } from './entities';
@@ -12,7 +12,7 @@ import { AuthModule } from '../auth/auth.module';
   imports: [
     TypeOrmModule.forFeature([AuditLog]),
     ScheduleModule.forRoot(),
-    AuthModule,
+    forwardRef(() => AuthModule),
   ],
   controllers: [AuditController],
   providers: [AuditService, RequestContextService, AuditCleanupJob],

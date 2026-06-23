@@ -221,96 +221,61 @@ class EnvironmentVariables {
   DUPLICATE_DETECTION_TIME_WINDOW_DAYS?: number;
 }
 
-export function validateEnv(): EnvironmentVariables {
+export function validateEnv(config: Record<string, unknown> = {}): EnvironmentVariables {
+  const e = (key: string) => (config[key] as string) || process.env[key];
   const validatedEnv = plainToClass(
     EnvironmentVariables,
     {
-      NODE_ENV: process.env.NODE_ENV || 'development',
-      PORT: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
-      DB_HOST: process.env.DB_HOST || 'localhost',
-      DB_PORT: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
-      DB_USERNAME: process.env.DB_USERNAME || 'postgres',
-      DB_PASSWORD: process.env.DB_PASSWORD || 'password',
-      DB_NAME: process.env.DB_NAME || 'stellarcert',
-      JWT_SECRET: process.env.JWT_SECRET,
-      JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET,
-      JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-      JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',
-      JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
-      JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-      STELLAR_NETWORK: process.env.STELLAR_NETWORK || 'testnet',
-      STELLAR_HORIZON_URL:
-        process.env.STELLAR_HORIZON_URL ||
-        'https://horizon-testnet.stellar.org',
-      STELLAR_ISSUER_SECRET_KEY: process.env.STELLAR_ISSUER_SECRET_KEY || '',
-      STELLAR_ISSUER_PUBLIC_KEY: process.env.STELLAR_ISSUER_PUBLIC_KEY || '',
-      ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'http://localhost:5173',
-      SENTRY_DSN: process.env.SENTRY_DSN,
-      ENABLE_SENTRY: process.env.ENABLE_SENTRY === 'true',
-      EMAIL_SERVICE: process.env.EMAIL_SERVICE,
-      EMAIL_HOST: process.env.EMAIL_HOST,
-      EMAIL_PORT: process.env.EMAIL_PORT
-        ? parseInt(process.env.EMAIL_PORT, 10)
-        : undefined,
-      EMAIL_USERNAME: process.env.EMAIL_USERNAME,
-      EMAIL_PASSWORD: process.env.EMAIL_PASSWORD,
-      EMAIL_FROM: process.env.EMAIL_FROM,
-      SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
-      REDIS_URL: process.env.REDIS_URL,
-      STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT,
-      STORAGE_REGION: process.env.STORAGE_REGION,
-      STORAGE_ACCESS_KEY: process.env.STORAGE_ACCESS_KEY,
-      STORAGE_SECRET_KEY: process.env.STORAGE_SECRET_KEY,
-      STORAGE_BUCKET: process.env.STORAGE_BUCKET,
-      STORAGE_REQUIRED: process.env.STORAGE_REQUIRED !== 'false',
-      AUDIT_RETENTION_DAYS: process.env.AUDIT_RETENTION_DAYS
-        ? parseInt(process.env.AUDIT_RETENTION_DAYS, 10)
-        : undefined,
-      REQUEST_SIZE_LIMIT: process.env.REQUEST_SIZE_LIMIT,
-      RATE_LIMIT_DEFAULT_WINDOW_MS: process.env.RATE_LIMIT_DEFAULT_WINDOW_MS
-        ? parseInt(process.env.RATE_LIMIT_DEFAULT_WINDOW_MS, 10)
-        : undefined,
-      RATE_LIMIT_DEFAULT_MAX_REQUESTS: process.env
-        .RATE_LIMIT_DEFAULT_MAX_REQUESTS
-        ? parseInt(process.env.RATE_LIMIT_DEFAULT_MAX_REQUESTS, 10)
-        : undefined,
-      AUTH_BRUTE_FORCE_WINDOW_MS: process.env.AUTH_BRUTE_FORCE_WINDOW_MS
-        ? parseInt(process.env.AUTH_BRUTE_FORCE_WINDOW_MS, 10)
-        : undefined,
-      AUTH_BRUTE_FORCE_MAX_ATTEMPTS: process.env.AUTH_BRUTE_FORCE_MAX_ATTEMPTS
-        ? parseInt(process.env.AUTH_BRUTE_FORCE_MAX_ATTEMPTS, 10)
-        : undefined,
-      VERIFICATION_RATE_LIMIT_WINDOW_MS: process.env
-        .VERIFICATION_RATE_LIMIT_WINDOW_MS
-        ? parseInt(process.env.VERIFICATION_RATE_LIMIT_WINDOW_MS, 10)
-        : 60 * 1000, // 1 minute default
-      VERIFICATION_RATE_LIMIT_MAX_REQUESTS: process.env
-        .VERIFICATION_RATE_LIMIT_MAX_REQUESTS
-        ? parseInt(process.env.VERIFICATION_RATE_LIMIT_MAX_REQUESTS, 10)
-        : 100, // 100 requests per minute default
-      SECURITY_CSP: process.env.SECURITY_CSP,
-      SECURITY_FORCE_HSTS: process.env.SECURITY_FORCE_HSTS,
-      DUPLICATE_DETECTION_THRESHOLD: process.env.DUPLICATE_DETECTION_THRESHOLD
-        ? parseFloat(process.env.DUPLICATE_DETECTION_THRESHOLD)
-        : undefined,
-      DUPLICATE_DETECTION_EMAIL_WEIGHT: process.env
-        .DUPLICATE_DETECTION_EMAIL_WEIGHT
-        ? parseFloat(process.env.DUPLICATE_DETECTION_EMAIL_WEIGHT)
-        : undefined,
-      DUPLICATE_DETECTION_NAME_WEIGHT: process.env
-        .DUPLICATE_DETECTION_NAME_WEIGHT
-        ? parseFloat(process.env.DUPLICATE_DETECTION_NAME_WEIGHT)
-        : undefined,
-      DUPLICATE_DETECTION_TITLE_WEIGHT: process.env
-        .DUPLICATE_DETECTION_TITLE_WEIGHT
-        ? parseFloat(process.env.DUPLICATE_DETECTION_TITLE_WEIGHT)
-        : undefined,
-      DUPLICATE_DETECTION_FUZZY_MATCHING:
-        process.env.DUPLICATE_DETECTION_FUZZY_MATCHING === 'true',
-      DUPLICATE_DETECTION_TIME_WINDOW_DAYS: process.env
-        .DUPLICATE_DETECTION_TIME_WINDOW_DAYS
-        ? parseInt(process.env.DUPLICATE_DETECTION_TIME_WINDOW_DAYS, 10)
-        : undefined,
+      NODE_ENV: e('NODE_ENV') || 'development',
+      PORT: e('PORT') ? parseInt(e('PORT') as string, 10) : 3000,
+      DB_HOST: e('DB_HOST') || 'localhost',
+      DB_PORT: e('DB_PORT') ? parseInt(e('DB_PORT') as string, 10) : 5432,
+      DB_USERNAME: e('DB_USERNAME') || 'postgres',
+      DB_PASSWORD: e('DB_PASSWORD') || 'password',
+      DB_NAME: e('DB_NAME') || 'stellarcert',
+      JWT_SECRET: e('JWT_SECRET'),
+      JWT_ACCESS_SECRET: e('JWT_ACCESS_SECRET') || e('JWT_SECRET'),
+      JWT_REFRESH_SECRET: e('JWT_REFRESH_SECRET') || e('JWT_SECRET'),
+      JWT_EXPIRES_IN: e('JWT_EXPIRES_IN') || '24h',
+      JWT_ACCESS_EXPIRES_IN: e('JWT_ACCESS_EXPIRES_IN') || '15m',
+      JWT_REFRESH_EXPIRES_IN: e('JWT_REFRESH_EXPIRES_IN') || '7d',
+      STELLAR_NETWORK: e('STELLAR_NETWORK') || 'testnet',
+      STELLAR_HORIZON_URL: e('STELLAR_HORIZON_URL') || 'https://horizon-testnet.stellar.org',
+      STELLAR_ISSUER_SECRET_KEY: e('STELLAR_ISSUER_SECRET_KEY') || '',
+      STELLAR_ISSUER_PUBLIC_KEY: e('STELLAR_ISSUER_PUBLIC_KEY') || '',
+      ALLOWED_ORIGINS: e('ALLOWED_ORIGINS') || 'http://localhost:5173',
+      SENTRY_DSN: e('SENTRY_DSN'),
+      ENABLE_SENTRY: e('ENABLE_SENTRY') === 'true',
+      EMAIL_SERVICE: e('EMAIL_SERVICE'),
+      EMAIL_HOST: e('EMAIL_HOST'),
+      EMAIL_PORT: e('EMAIL_PORT') ? parseInt(e('EMAIL_PORT') as string, 10) : undefined,
+      EMAIL_USERNAME: e('EMAIL_USERNAME'),
+      EMAIL_PASSWORD: e('EMAIL_PASSWORD'),
+      EMAIL_FROM: e('EMAIL_FROM'),
+      SENDGRID_API_KEY: e('SENDGRID_API_KEY'),
+      REDIS_URL: e('REDIS_URL'),
+      STORAGE_ENDPOINT: e('STORAGE_ENDPOINT'),
+      STORAGE_REGION: e('STORAGE_REGION'),
+      STORAGE_ACCESS_KEY: e('STORAGE_ACCESS_KEY'),
+      STORAGE_SECRET_KEY: e('STORAGE_SECRET_KEY'),
+      STORAGE_BUCKET: e('STORAGE_BUCKET'),
+      STORAGE_REQUIRED: e('STORAGE_REQUIRED') !== 'false',
+      AUDIT_RETENTION_DAYS: e('AUDIT_RETENTION_DAYS') ? parseInt(e('AUDIT_RETENTION_DAYS') as string, 10) : undefined,
+      REQUEST_SIZE_LIMIT: e('REQUEST_SIZE_LIMIT'),
+      RATE_LIMIT_DEFAULT_WINDOW_MS: e('RATE_LIMIT_DEFAULT_WINDOW_MS') ? parseInt(e('RATE_LIMIT_DEFAULT_WINDOW_MS') as string, 10) : undefined,
+      RATE_LIMIT_DEFAULT_MAX_REQUESTS: e('RATE_LIMIT_DEFAULT_MAX_REQUESTS') ? parseInt(e('RATE_LIMIT_DEFAULT_MAX_REQUESTS') as string, 10) : undefined,
+      AUTH_BRUTE_FORCE_WINDOW_MS: e('AUTH_BRUTE_FORCE_WINDOW_MS') ? parseInt(e('AUTH_BRUTE_FORCE_WINDOW_MS') as string, 10) : undefined,
+      AUTH_BRUTE_FORCE_MAX_ATTEMPTS: e('AUTH_BRUTE_FORCE_MAX_ATTEMPTS') ? parseInt(e('AUTH_BRUTE_FORCE_MAX_ATTEMPTS') as string, 10) : undefined,
+      VERIFICATION_RATE_LIMIT_WINDOW_MS: e('VERIFICATION_RATE_LIMIT_WINDOW_MS') ? parseInt(e('VERIFICATION_RATE_LIMIT_WINDOW_MS') as string, 10) : 60 * 1000,
+      VERIFICATION_RATE_LIMIT_MAX_REQUESTS: e('VERIFICATION_RATE_LIMIT_MAX_REQUESTS') ? parseInt(e('VERIFICATION_RATE_LIMIT_MAX_REQUESTS') as string, 10) : 100,
+      SECURITY_CSP: e('SECURITY_CSP'),
+      SECURITY_FORCE_HSTS: e('SECURITY_FORCE_HSTS'),
+      DUPLICATE_DETECTION_THRESHOLD: e('DUPLICATE_DETECTION_THRESHOLD') ? parseFloat(e('DUPLICATE_DETECTION_THRESHOLD') as string) : undefined,
+      DUPLICATE_DETECTION_EMAIL_WEIGHT: e('DUPLICATE_DETECTION_EMAIL_WEIGHT') ? parseFloat(e('DUPLICATE_DETECTION_EMAIL_WEIGHT') as string) : undefined,
+      DUPLICATE_DETECTION_NAME_WEIGHT: e('DUPLICATE_DETECTION_NAME_WEIGHT') ? parseFloat(e('DUPLICATE_DETECTION_NAME_WEIGHT') as string) : undefined,
+      DUPLICATE_DETECTION_TITLE_WEIGHT: e('DUPLICATE_DETECTION_TITLE_WEIGHT') ? parseFloat(e('DUPLICATE_DETECTION_TITLE_WEIGHT') as string) : undefined,
+      DUPLICATE_DETECTION_FUZZY_MATCHING: e('DUPLICATE_DETECTION_FUZZY_MATCHING') === 'true',
+      DUPLICATE_DETECTION_TIME_WINDOW_DAYS: e('DUPLICATE_DETECTION_TIME_WINDOW_DAYS') ? parseInt(e('DUPLICATE_DETECTION_TIME_WINDOW_DAYS') as string, 10) : undefined,
     },
     { enableImplicitConversion: true },
   );

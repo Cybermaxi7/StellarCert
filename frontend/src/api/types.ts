@@ -6,6 +6,8 @@ export enum UserRole {
   ISSUER = "issuer",
   RECIPIENT = "recipient",
   VERIFIER = "verifier",
+  AUDITOR = "auditor",
+  USER = "user",
 }
 
 /**
@@ -17,14 +19,15 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  isEmailVerified?: boolean;
   stellarPublicKey?: string;
   organization?: string;
   username?: string;
   phone?: string;
   metadata?: Record<string, unknown>;
   profilePicture?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /**
@@ -33,7 +36,9 @@ export interface User {
 export interface AuthResponse {
   user: User;
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  requiresEmailVerification?: boolean;
 }
 
 /**
@@ -106,7 +111,7 @@ export interface CreateCertificateData {
   issuerName: string;
   issueDate: string;
   issuerId: string;
-  recipientId: string;
+  recipientId?: string;
   expiryDate?: string;
   templateId?: string;
   metadata?: Record<string, unknown>;
@@ -295,7 +300,6 @@ export interface RegisterData {
   password?: string;
   firstName: string;
   lastName: string;
-  role: UserRole;
   [key: string]: unknown;
 }
 

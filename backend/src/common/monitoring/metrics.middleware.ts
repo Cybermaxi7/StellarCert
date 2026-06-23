@@ -12,22 +12,21 @@ export class MetricsMiddleware implements NestMiddleware {
     const { method, path } = req;
 
     // Hook into response to capture metrics
-    const originalSend = res.send;
+    const originalSend = res.send.bind(res);
+    const metricsService = this.metricsService;
     res.send = function (data: any) {
-      const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+      const duration = (Date.now() - startTime) / 1000;
       const status = res.statusCode;
-      const metricsService = this.metricsService;
       const route = metricsService.normalizeRoute(path);
 
-      // Record metrics
       metricsService.recordHttpRequestDuration(method, route, status, duration);
 
       if (status >= 400) {
         metricsService.recordHttpError(method, route, status);
       }
 
-      return originalSend.call(this, data);
-    }.bind({ metricsService: this.metricsService });
+      return originalSend(data);
+    };
 
     next();
   }

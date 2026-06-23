@@ -71,7 +71,7 @@ async function bootstrap() {
   // Use global pipes and filters
   app.useGlobalPipes(new RequestValidationPipe());
   app.useGlobalFilters(
-    new GlobalExceptionFilter(sentryService, loggingService),
+    new GlobalExceptionFilter(app.get(ConfigService), sentryService, loggingService),
   );
 
   // Add global security and monitoring interceptors

@@ -58,7 +58,11 @@ export class JwtAuthGuard implements CanActivate {
       const payload = this.jwtService.verify(token, {
         secret,
       });
-      request.user = payload as User;
+      // Map JWT payload fields to the user object shape expected by decorators
+      request.user = {
+        ...payload,
+        id: payload.sub,    // sub → id so @CurrentUser() gives user.id
+      } as unknown as User;
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'TokenExpiredError') {
         throw new AuthException(ErrorCode.TOKEN_EXPIRED, 'Token has expired');

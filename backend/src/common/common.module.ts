@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Global, Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { BullModule } from '@nestjs/bull';
@@ -30,6 +30,7 @@ import {
 } from './rate-limiting/rate-limit.service';
 import { Issuer } from '../modules/issuers/entities/issuer.entity';
 
+@Global()
 @Module({
   imports: [
     ConfigModule,
@@ -37,7 +38,10 @@ import { Issuer } from '../modules/issuers/entities/issuer.entity';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const secret = configService.get<string>('JWT_ACCESS_SECRET');
+        const secret = configService.get<string>('JWT_ACCESS_SECRET')
+          || configService.get<string>('JWT_SECRET')
+          || process.env.JWT_ACCESS_SECRET
+          || process.env.JWT_SECRET;
         const expiresIn = (configService.get<string>('JWT_ACCESS_EXPIRES_IN') ||
           '15m') as any;
 

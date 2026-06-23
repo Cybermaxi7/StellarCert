@@ -65,6 +65,7 @@ import {
 import { ProfilePictureUploadResponseDto } from './dto/upload-profile-picture.dto';
 import { StorageService } from '../files/services/storage.service';
 import { maxFileSize, allowedImageMimeTypes } from 'src/common/constants';
+import { Public } from 'src/common/decorators/public.decorator';
 
 @ApiTags('Users')
 @Controller('users')
@@ -130,6 +131,7 @@ export class UsersController {
 
   // ==================== Email Verification Endpoints ====================
 
+  @Public()
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify email address' })
@@ -143,6 +145,7 @@ export class UsersController {
     return this.usersService.verifyEmail(verifyEmailDto);
   }
 
+  @Public()
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Resend email verification' })
@@ -157,6 +160,7 @@ export class UsersController {
 
   // ==================== Password Management Endpoints ====================
 
+  @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset' })
@@ -169,6 +173,7 @@ export class UsersController {
     return this.usersService.forgotPassword(forgotPasswordDto);
   }
 
+  @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset password with token' })

@@ -114,6 +114,7 @@ export class CertificateService {
       const certificate = queryRunner.manager.create(Certificate, {
         ...dto,
         recipientId,
+        certificateId: this.generateCertificateId(),
         expiresAt:
           dto.expiresAt || this.calculateDefaultExpiry(),
         verificationCode:
@@ -121,6 +122,10 @@ export class CertificateService {
           this.generateVerificationCode(),
         isDuplicate: false,
       });
+      // TypeORM quirk: dual @Column()/@ManyToOne() on same column name — set issuerId directly
+      if (dto.issuerId) {
+        (certificate as any).issuerId = dto.issuerId;
+      }
 
       const savedCertificate = await queryRunner.manager.save(certificate);
 
@@ -610,7 +615,7 @@ export class CertificateService {
       cert.recipientEmail,
       cert.title,
       cert.courseName,
-      cert.issuer?.name || 'Unknown',
+      cert.issuerName ?? (cert.issuer ? (`${cert.issuer.firstName ?? ''} ${cert.issuer.lastName ?? ''}`.trim() || 'Unknown') : 'Unknown'),
       cert.issuedAt.toISOString().split('T')[0],
       cert.status,
       cert.expiresAt ? cert.expiresAt.toISOString().split('T')[0] : '',
@@ -778,8 +783,10 @@ export class CertificateService {
     ipAddress: string,
     userAgent: string,
   ): Promise<Certificate> {
+    // Override issuerId with the authenticated user's ID (users table)
+    const dtoWithUserId = { ...dto, issuerId: userId } as CreateCertificateDto;
     return this.create(
-      dto as CreateCertificateDto,
+      dtoWithUserId,
       (dto as any).duplicateConfig,
       (dto as any).overrideReason,
       ipAddress,
@@ -820,5 +827,15 @@ export class CertificateService {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return code;
+  }
+
+  private generateCertificateId(): string {
+    const year = new Date().getFullYear();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let suffix = '';
+    for (let i = 0; i < 8; i++) {
+      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `CERT-${year}-${suffix}`;
   }
 }

@@ -28,52 +28,59 @@ export class EmailService {
   private templates: Map<string, HandlebarsTemplateDelegate> = new Map();
 
   constructor(private configService: ConfigService, private readonly logger: LoggingService) {
-    this.initializeTransporter();
+    this.initializeTransporter().catch(err =>
+      this.logger.error(`Email transporter init failed: ${err.message}`),
+    );
     this.loadTemplates();
   }
 
-  private initializeTransporter(): void {
+  private async initializeTransporter(): Promise<void> {
     const emailService = this.configService.get<string>('EMAIL_SERVICE');
-    const emailFrom = this.configService.get<string>('EMAIL_FROM');
+    const sendGridApiKey = this.configService.get<string>('SENDGRID_API_KEY');
+    const emailHost = this.configService.get<string>('EMAIL_HOST');
+    const emailUsername = this.configService.get<string>('EMAIL_USERNAME');
 
-    let config: EmailConfig = {};
-
-    if (
-      emailService === 'sendgrid' ||
-      this.configService.get<string>('SENDGRID_API_KEY')
-    ) {
-      // SendGrid configuration
-      const sendGridApiKey = this.configService.get<string>('SENDGRID_API_KEY');
-      config = {
+    if (emailService === 'sendgrid' || sendGridApiKey) {
+      this.transporter = nodemailer.createTransport({
         host: 'smtp.sendgrid.net',
         port: 587,
         secure: false,
-        auth: {
-          user: 'apikey',
-          pass: sendGridApiKey || 'your-sendgrid-api-key',
-        },
-      };
+        auth: { user: 'apikey', pass: sendGridApiKey },
+      });
       this.logger.log('Email service configured with SendGrid');
-    } else {
-      // Nodemailer SMTP configuration
-      const emailHost = this.configService.get<string>('EMAIL_HOST');
-      const emailPort = this.configService.get<number>('EMAIL_PORT') || 587;
-      const emailUsername = this.configService.get<string>('EMAIL_USERNAME');
-      const emailPassword = this.configService.get<string>('EMAIL_PASSWORD');
-
-      config = {
-        host: emailHost || 'smtp.mailtrap.io',
-        port: emailPort,
-        secure: emailPort === 465,
-        auth: {
-          user: emailUsername || 'user@example.com',
-          pass: emailPassword || 'password',
-        },
-      };
-      this.logger.log('Email service configured with SMTP');
+      return;
     }
 
-    this.transporter = nodemailer.createTransport(config);
+    if (emailHost && emailUsername) {
+      const emailPort = this.configService.get<number>('EMAIL_PORT') || 587;
+      const emailPassword = this.configService.get<string>('EMAIL_PASSWORD');
+      this.transporter = nodemailer.createTransport({
+        host: emailHost,
+        port: emailPort,
+        secure: emailPort === 465,
+        auth: { user: emailUsername, pass: emailPassword },
+      });
+      this.logger.log(`Email service configured with SMTP host: ${emailHost}`);
+      return;
+    }
+
+    // No credentials configured — use Ethereal test account in dev
+    this.logger.log('No email credentials configured — creating Ethereal test account...');
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      this.transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: { user: testAccount.user, pass: testAccount.pass },
+      });
+      this.logger.log(`Ethereal test account: ${testAccount.user} / ${testAccount.pass}`);
+      this.logger.log('Email previews available at https://ethereal.email');
+    } catch (err) {
+      this.logger.error(`Failed to create Ethereal test account: ${err.message}`);
+      // Fallback: create a no-op transporter so the app still starts
+      this.transporter = nodemailer.createTransport({ streamTransport: true, newline: 'unix', buffer: true });
+    }
   }
 
   private loadTemplates(): void {
@@ -101,6 +108,10 @@ export class EmailService {
   }
 
   async sendEmail(dto: SendEmailDto): Promise<void> {
+    if (!this.transporter) {
+      this.logger.warn(`Email transporter not ready — skipping email to ${dto.to}`);
+      return;
+    }
     try {
       const template = this.templates.get(dto.template);
       if (!template) {
@@ -121,6 +132,11 @@ export class EmailService {
 
       const info = await this.transporter.sendMail(mailOptions);
       this.logger.log(`Email sent to ${dto.to}: ${info.response}`);
+      // When using Ethereal, log the preview URL so devs can read the email
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      if (previewUrl) {
+        this.logger.log(`Email preview URL: ${previewUrl}`);
+      }
     } catch (error) {
       this.logger.error(`Failed to send email to ${dto.to}: ${error.message}`);
       throw error;

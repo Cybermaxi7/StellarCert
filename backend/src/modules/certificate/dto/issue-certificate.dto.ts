@@ -15,9 +15,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class IssueCertificateDto {
-  @ApiProperty({ description: 'Issuer UUID', format: 'uuid' })
+  @ApiPropertyOptional({ description: 'Issuer UUID (overridden by authenticated user id)', format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  issuerId: string;
+  issuerId?: string;
 
   @ApiPropertyOptional({
     description: 'Recipient user UUID (if recipient is a registered user)',
@@ -111,6 +112,16 @@ export class IssueCertificateDto {
   })
   @IsOptional()
   skipStellar?: boolean;
+
+  @ApiPropertyOptional({ description: 'Course name associated with the certificate' })
+  @IsOptional()
+  @IsString()
+  courseName?: string;
+
+  @ApiPropertyOptional({ description: 'Template UUID to use when generating the certificate', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  templateId?: string;
 }
 
 export class IssueCertificateBatchDto {

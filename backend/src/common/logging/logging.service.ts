@@ -1,6 +1,6 @@
 import { Injectable, Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 
 export interface LogContext {
   correlationId?: string;

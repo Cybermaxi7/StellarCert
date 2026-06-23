@@ -78,6 +78,7 @@ export class CertificateIssuanceService {
     try {
       const certificate = queryRunner.manager.create(Certificate, {
         ...createCertificateDto,
+        certificateId: this.generateCertificateId(),
         expiresAt:
           createCertificateDto.expiresAt || this.calculateDefaultExpiry(),
         verificationCode:
@@ -144,5 +145,15 @@ export class CertificateIssuanceService {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return code;
+  }
+
+  private generateCertificateId(): string {
+    const year = new Date().getFullYear();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let suffix = '';
+    for (let i = 0; i < 8; i++) {
+      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `CERT-${year}-${suffix}`;
   }
 }

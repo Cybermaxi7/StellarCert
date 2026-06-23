@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { resolve } from 'path';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { BullBoardModule } from '@bull-board/nestjs';
@@ -30,6 +31,7 @@ import { SecurityModule } from './modules/security/security.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
+      envFilePath: [resolve(__dirname, '../../.env'), '.env'],
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],

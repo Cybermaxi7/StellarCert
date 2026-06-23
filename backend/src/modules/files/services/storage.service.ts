@@ -7,7 +7,7 @@ import {
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 import { extname } from 'path';
 import { LoggingService } from "../../../common/logging/logging.service";
 
@@ -19,8 +19,8 @@ export class StorageService implements OnModuleInit {
 
   constructor(private readonly configService: ConfigService, private readonly logger: LoggingService) {
     this.bucket = this.configService.get<string>('STORAGE_BUCKET') ?? '';
-    this.isStorageRequired =
-      this.configService.get<string>('STORAGE_REQUIRED') !== 'false';
+    const storageRequiredValue = this.configService.get('STORAGE_REQUIRED');
+    this.isStorageRequired = storageRequiredValue !== false && storageRequiredValue !== 'false';
 
     const region = this.configService.get<string>('STORAGE_REGION');
     const endpoint = this.configService.get<string>('STORAGE_ENDPOINT');

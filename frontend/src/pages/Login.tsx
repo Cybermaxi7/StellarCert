@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { LogIn, UserPlus, Shield, Eye, EyeOff } from "lucide-react";
-import { authApi, UserRole } from "../api";
+import { authApi } from "../api";
 import { useAuth } from "../context/AuthContext";
 
 type LoadingPhase = "idle" | "registering" | "logging-in";
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnUrl = searchParams.get("returnUrl") ?? "/";
   const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -19,12 +21,13 @@ const Login = () => {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "", password: "", confirmPassword: "",
-    firstName: "", lastName: "", role: UserRole.RECIPIENT,
+    firstName: "", lastName: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
     if (!isLogin) {
       if (formData.password !== formData.confirmPassword) {
         setError("Passwords do not match.");
@@ -35,23 +38,29 @@ const Login = () => {
         return;
       }
     }
+
     try {
       if (!isLogin) {
         setLoadingPhase("registering");
-        await authApi.register({
-          firstName: formData.firstName, lastName: formData.lastName,
-          role: formData.role, email: formData.email, password: formData.password,
+        const regRes = await authApi.register({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
         });
+        login(regRes.accessToken, regRes.refreshToken, regRes.user);
+        navigate(returnUrl, { replace: true });
+        return;
       }
+
       setLoadingPhase("logging-in");
       const res = await authApi.login({ email: formData.email, password: formData.password });
       if (res.accessToken) {
-        // Use AuthContext.login() to keep token storage and isAuthenticated in sync
         login(res.accessToken, res.refreshToken, res.user);
-        navigate("/");
+        navigate(returnUrl, { replace: true });
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Authentication failed.");
+      setError((err as { message?: string })?.message ?? "Authentication failed.");
     } finally {
       setLoadingPhase("idle");
     }
@@ -107,23 +116,12 @@ const Login = () => {
             </div>
           </div>
           {!isLogin && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Confirm Password</label>
-                <input type={showPassword ? "text" : "password"} value={formData.confirmPassword}
-                  onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-white border-gray-300 dark:border-slate-700" required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Role</label>
-                <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value as UserRole })}
-                  className="w-full px-4 py-2 border rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-white border-gray-300 dark:border-slate-700" required>
-                  <option value={UserRole.RECIPIENT}>Certificate Holder</option>
-                  <option value={UserRole.ISSUER}>Certificate Issuer</option>
-                  <option value={UserRole.VERIFIER}>Certificate Verifier</option>
-                </select>
-              </div>
-            </>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Confirm Password</label>
+              <input type={showPassword ? "text" : "password"} value={formData.confirmPassword}
+                onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                className="w-full px-4 py-2 border rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-white border-gray-300 dark:border-slate-700" required />
+            </div>
           )}
           <button type="submit" disabled={loadingPhase !== "idle"}
             className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-md flex items-center justify-center gap-2">
@@ -144,16 +142,16 @@ const Login = () => {
                 ) : (
                   <div className="flex gap-2">
                     <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
-                      placeholder="you@example.com" className="flex-1 px-3 py-2 border rounded-md" />
+                      placeholder="you@example.com" className="flex-1 px-3 py-2 border rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
                     <button onClick={async () => {
                       setForgotLoading(true); setError(null);
                       try {
                         await authApi.forgotPassword({ email: forgotEmail });
                         setForgotSuccess("If the email exists, a reset link has been sent.");
                       } catch (err: unknown) {
-                        setError(err instanceof Error ? err.message : "Failed to request password reset");
+                        setError((err as { message?: string })?.message ?? "Failed to request password reset");
                       } finally { setForgotLoading(false); }
-                    }} disabled={forgotLoading} className="px-3 py-2 bg-blue-600 text-white rounded-md">
+                    }} disabled={forgotLoading} className="px-3 py-2 bg-blue-600 text-white rounded-md disabled:opacity-60">
                       {forgotLoading ? "Sending…" : "Send"}
                     </button>
                   </div>

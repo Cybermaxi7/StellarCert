@@ -6,14 +6,9 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
+import { UserRole } from '../../../common/constants/roles.js';
 
-export enum UserRole {
-  USER = 'user',
-  ISSUER = 'issuer',
-  ADMIN = 'admin',
-  RECIPIENT = 'recipient',
-  VERIFIER = 'verifier',
-}
+export { UserRole };
 
 export enum UserStatus {
   ACTIVE = 'active',
@@ -52,7 +47,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.USER,
+    default: UserRole.ISSUER,
   })
   role: UserRole;
 
@@ -101,7 +96,7 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lockedUntil: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   refreshToken: string | null;
 
   @Column({ type: 'timestamp', nullable: true })
@@ -110,7 +105,7 @@ export class User {
   @Column({ default: false })
   twoFactorEnabled: boolean;
 
-  @Column({ nullable: true, select: false })
+  @Column({ type: 'varchar', nullable: true, select: false })
   twoFactorSecret: string | null;
 
   @Column({ type: 'simple-array', nullable: true, select: false })

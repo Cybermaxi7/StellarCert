@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule } from '@nestjs/config';
@@ -14,6 +14,8 @@ import { CertificatePdfService } from './services/pdf.service';
 
 import { CertificateController } from './certificate.controller';
 import { DuplicateDetectionController } from './controllers/duplicate-detection.controller';
+import { TemplatesController } from './controllers/templates.controller';
+import { CertificateMapper } from './mappers/certificate.mapper';
 
 import { MetadataSchemaModule } from '../metadata-schema/metadata-schema.module';
 import { AuthModule } from '../auth/auth.module';
@@ -33,7 +35,7 @@ import { EmailModule } from '../email/email.module';
     }),
     ConfigModule,
     MetadataSchemaModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
     WebhooksModule,
     StellarModule,
     AuditModule,
@@ -44,12 +46,14 @@ import { EmailModule } from '../email/email.module';
   controllers: [
     CertificateController,
     DuplicateDetectionController,
+    TemplatesController,
   ],
   providers: [
     CertificateService,
     CertificateStatsService,
     DuplicateDetectionService,
     CertificatePdfService,
+    CertificateMapper,
   ],
   exports: [CertificateService, CertificateStatsService],
 })

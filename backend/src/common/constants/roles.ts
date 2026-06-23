@@ -6,6 +6,8 @@ export enum UserRole {
   ISSUER = 'issuer',
   USER = 'user',
   AUDITOR = 'auditor',
+  RECIPIENT = 'recipient',
+  VERIFIER = 'verifier',
 }
 
 export const ROLE_HIERARCHY = {
@@ -14,9 +16,13 @@ export const ROLE_HIERARCHY = {
     UserRole.ISSUER,
     UserRole.USER,
     UserRole.AUDITOR,
+    UserRole.RECIPIENT,
+    UserRole.VERIFIER,
   ],
-  [UserRole.ISSUER]: [UserRole.ISSUER, UserRole.USER],
-  [UserRole.AUDITOR]: [UserRole.AUDITOR, UserRole.USER],
+  [UserRole.ISSUER]: [UserRole.ISSUER, UserRole.USER, UserRole.RECIPIENT],
+  [UserRole.AUDITOR]: [UserRole.AUDITOR, UserRole.USER, UserRole.VERIFIER],
+  [UserRole.VERIFIER]: [UserRole.VERIFIER, UserRole.USER],
+  [UserRole.RECIPIENT]: [UserRole.RECIPIENT, UserRole.USER],
   [UserRole.USER]: [UserRole.USER],
 };
 

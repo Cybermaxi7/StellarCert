@@ -27,50 +27,6 @@ export class StatsQueryDto {
   issuerId?: string;
 }
 
-export class CertificateStatsDto {
-  @ApiProperty({
-    description: 'Total number of certificates',
-    example: 1280,
-  })
-  totalCertificates: number;
-
-  @ApiProperty({
-    description: 'Number of active certificates',
-    example: 1024,
-  })
-  activeCertificates: number;
-
-  @ApiProperty({
-    description: 'Number of revoked certificates',
-    example: 128,
-  })
-  revokedCertificates: number;
-
-  @ApiProperty({
-    description: 'Number of expired certificates',
-    example: 128,
-  })
-  expiredCertificates: number;
-
-  @ApiProperty({
-    description: 'Trend of certificate issuance over time',
-    type: [IssuanceTrendDto],
-  })
-  issuanceTrend: IssuanceTrendDto[];
-
-  @ApiProperty({
-    description: 'Top certificate issuers by volume',
-    type: [TopIssuerDto],
-  })
-  topIssuers: TopIssuerDto[];
-
-  @ApiProperty({
-    description: 'Verification statistics summary',
-    type: VerificationStatsDto,
-  })
-  verificationStats: VerificationStatsDto;
-}
-
 export class IssuanceTrendDto {
   @ApiProperty({
     description: 'Date for the issuance count',
@@ -135,4 +91,48 @@ export class VerificationStatsDto {
     example: 560,
   })
   weeklyVerifications: number;
+}
+
+export class CertificateStatsDto {
+  @ApiProperty({
+    description: 'Total number of certificates',
+    example: 1280,
+  })
+  totalCertificates: number;
+
+  @ApiProperty({
+    description: 'Number of active certificates',
+    example: 1024,
+  })
+  activeCertificates: number;
+
+  @ApiProperty({
+    description: 'Number of revoked certificates',
+    example: 128,
+  })
+  revokedCertificates: number;
+
+  @ApiProperty({
+    description: 'Number of expired certificates',
+    example: 128,
+  })
+  expiredCertificates: number;
+
+  @ApiProperty({
+    description: 'Trend of certificate issuance over time',
+    type: [IssuanceTrendDto],
+  })
+  issuanceTrend: IssuanceTrendDto[];
+
+  @ApiProperty({
+    description: 'Top certificate issuers by volume',
+    type: [TopIssuerDto],
+  })
+  topIssuers: TopIssuerDto[];
+
+  @ApiProperty({
+    description: 'Verification statistics summary',
+    type: VerificationStatsDto,
+  })
+  verificationStats: VerificationStatsDto;
 }

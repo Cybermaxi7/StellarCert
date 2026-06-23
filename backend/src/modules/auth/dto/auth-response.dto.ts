@@ -7,7 +7,10 @@ export class AuthResponseDto {
     email: string;
     firstName: string;
     lastName: string;
+    role: string;
+    isEmailVerified: boolean;
   };
+  requiresEmailVerification?: boolean;
   metadata?: {
     version: string;
     timestamp: string;

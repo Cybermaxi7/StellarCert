@@ -1,5 +1,6 @@
 import {
   ActivityItem,
+  AdminAnalytics,
   ApiError,
   AuthResponse,
   Certificate,
@@ -1316,7 +1317,18 @@ export const dashboardApi = {
         ],
       };
     }
-    return apiClient<DashboardStats>("/admin/analytics/dashboard");
+    const data = await apiClient<AdminAnalytics>("/admin/analytics");
+    return {
+      totalCertificates: data.certificatesByStatus.total,
+      activeCertificates: data.certificatesByStatus.active,
+      revokedCertificates: data.certificatesByStatus.revoked,
+      expiredCertificates: data.certificatesByStatus.expired,
+      totalVerifications: data.verificationTrends.total,
+      verifications24h: data.verificationTrends.last24Hours,
+      totalUsers: data.usersByRole.total,
+      issuanceTrend: data.certificateIssuanceTrend,
+      recentActivity: [],
+    };
   },
 
   getRecentActivity: async (limit = 10): Promise<ActivityItem[]> => {

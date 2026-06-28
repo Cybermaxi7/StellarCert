@@ -1,32 +1,56 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, Env, String, Symbol, Address};
 
+// Assuming your certificate storage structure looks similar to this:
+// #[contracttype]
+// pub struct Certificate {
+//     pub id: String,
+//     pub owner: Address,
+//     pub status: Symbol, // e.g., Symbol::new(&env, "Active")
+//     pub internal_reason: String,
+// }
+
 #[contract]
 pub struct CertificateContract;
 
 #[contractimpl]
 impl CertificateContract {
-    /// Mutates the off-chain metadata URI reference pointer for a certificate and broadcasts an event.
-    pub fn update_certificate_metadata(
-        env: Env, 
-        admin: Address, 
-        certificate_id: String, 
-        new_metadata_uri: String
+    /// Reissues a new certificate while atomically revoking the parent certificate to prevent coexistence.
+    pub fn reissue_certificate(
+        env: Env,
+        admin: Address,
+        original_id: String,
+        new_id: String,
+        new_metadata_uri: String,
     ) {
         admin.require_auth();
 
-        // 1. (Your existing logic) Fetch state from storage, update URI data, and persist changes
-        // let mut cert = env.storage().persistent().get(&certificate_id)...
-        // cert.metadata_uri = new_metadata_uri.clone();
-        // env.storage().persistent().set(&certificate_id, &cert);
+        // 1. Fetch and update the parent certificate to prevent simultaneous validity
+        let mut original_cert: Certificate = env
+            .storage()
+            .persistent()
+            .get(&original_id)
+            .unwrap_or_else(|| panic!("Original certificate not found"));
 
-        // 2. FIXED: Emit event so off-chain webhook processors and indexers can capture mutations
+        // Guard: Ensure the parent isn't already revoked
+        if original_cert.status == Symbol::new(&env, "Revoked") {
+            panic!("Cannot reissue from an already revoked certificate");
+        }
+
+        // Atomically transition the old certificate state
+        original_cert.status = Symbol::new(&env, "Revoked");
+        original_cert.internal_reason = String::from_str(&env, "Superseded");
+        env.storage().persistent().set(&original_id, &original_cert);
+
+        // 2. Emit an explicit revocation event for the original certificate
         env.events().publish(
-            (
-                Symbol::new(&env, "CertificateMetadataUpdatedEvent"), 
-                certificate_id
-            ), // Event Topics (Indexable)
-            new_metadata_uri // Event Data Payload (The updated content URI pointer)
+            (Symbol::new(&env, "CertificateRevokedEvent"), original_id.clone()),
+            String::from_str(&env, "Superseded")
         );
+
+        // 3. (Your existing logic) Initialize and store the new child certificate
+        // let new_cert = Certificate { id: new_id.clone(), ... };
+        // env.storage().persistent().set(&new_id, &new_cert);
+        // env.events().publish((Symbol::new(&env, "CertificateIssuedEvent"), new_id), ...);
     }
 }

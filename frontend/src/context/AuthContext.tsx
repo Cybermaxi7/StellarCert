@@ -19,7 +19,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   clearAuth: () => void;
-  login: (accessToken: string, refreshToken: string | undefined, user: User) => void;
+  login: (accessToken: string, user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -96,13 +96,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('user');
   };
 
-  const login = (accessToken: string, refreshToken: string | undefined, nextUser: User) => {
+  const login = (accessToken: string, nextUser: User) => {
     if (isTokenExpired(accessToken)) {
       console.error('Attempted to login with expired token');
       return;
     }
     tokenStorage.setAccessToken(accessToken);
-    if (refreshToken) tokenStorage.setRefreshToken(refreshToken);
     setUserState(nextUser);
   };
 

@@ -84,7 +84,7 @@ export class UserAuthService {
       emailVerificationToken,
       emailVerificationExpires,
       status: UserStatus.PENDING_VERIFICATION,
-      role: createUserDto.role || UserRole.ISSUER,
+      role: UserRole.ISSUER,
     });
 
     this.logger.log(`New user registered: ${user.email}`);

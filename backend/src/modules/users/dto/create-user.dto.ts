@@ -6,10 +6,8 @@ import {
   MinLength,
   MaxLength,
   Matches,
-  IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRole } from '../entities/user.entity';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -91,12 +89,4 @@ export class CreateUserDto {
   })
   stellarPublicKey?: string;
 
-  @ApiPropertyOptional({
-    description: 'User role (admin only)',
-    enum: UserRole,
-    default: UserRole.USER,
-  })
-  @IsOptional()
-  @IsEnum(UserRole, { message: 'Invalid user role' })
-  role?: UserRole;
 }

@@ -1,5 +1,7 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, String, Vec};
+use soroban_sdk::{
+    contract, contractimpl, symbol_short, Address, BytesN, Env, IntoVal, String, Val, Vec,
+};
 
 mod types;
 pub use types::*;
@@ -23,9 +25,9 @@ mod admin_multisig_test;
 #[cfg(test)]
 mod crl_test;
 #[cfg(test)]
-mod multisig_test;
-#[cfg(test)]
 mod issuer_test;
+#[cfg(test)]
+mod multisig_test;
 #[cfg(test)]
 mod status_test;
 
@@ -34,12 +36,21 @@ pub struct CertificateContract;
 
 #[contractimpl]
 impl CertificateContract {
+    fn set_persistent<K, V>(env: &Env, key: &K, value: &V)
+    where
+        K: IntoVal<Env, Val>,
+        V: IntoVal<Env, Val>,
+    {
+        env.storage().persistent().set(key, value);
+        persistent::extend_ttl(env, key, None);
+    }
+
     /// Initialize the contract with an admin account
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().persistent().has(&DataKey::Admin) {
             panic!("Admin already initialized");
         }
-        env.storage().persistent().set(&DataKey::Admin, &admin);
+        Self::set_persistent(&env, &DataKey::Admin, &admin);
     }
 
     pub fn add_issuer(env: Env, issuer: Address) {
@@ -52,8 +63,12 @@ impl CertificateContract {
 
         let key = DataKey::Issuer(issuer.clone());
         if !env.storage().persistent().has(&key) {
-            let count: u32 = env.storage().persistent().get(&DataKey::IssuerCount).unwrap_or(0);
-            env.storage().persistent().set(&DataKey::IssuerCount, &(count + 1));
+            let count: u32 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::IssuerCount)
+                .unwrap_or(0);
+            Self::set_persistent(&env, &DataKey::IssuerCount, &(count + 1));
 
             let mut issuers: Vec<Address> = env
                 .storage()
@@ -61,9 +76,9 @@ impl CertificateContract {
                 .get(&DataKey::Issuers)
                 .unwrap_or(Vec::new(&env));
             issuers.push_back(issuer.clone());
-            env.storage().persistent().set(&DataKey::Issuers, &issuers);
+            Self::set_persistent(&env, &DataKey::Issuers, &issuers);
         }
-        env.storage().persistent().set(&key, &true);
+        Self::set_persistent(&env, &key, &true);
     }
 
     /// Check if an address is an authorized issuer
@@ -109,9 +124,7 @@ impl CertificateContract {
                 .persistent()
                 .get(&DataKey::IssuerCount)
                 .unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&DataKey::IssuerCount, &count.saturating_sub(1));
+            Self::set_persistent(&env, &DataKey::IssuerCount, &count.saturating_sub(1));
 
             // Rebuild the Issuers vec without the removed address.
             let issuers: Vec<Address> = env
@@ -125,9 +138,7 @@ impl CertificateContract {
                     updated.push_back(addr);
                 }
             }
-            env.storage()
-                .persistent()
-                .set(&DataKey::Issuers, &updated);
+            Self::set_persistent(&env, &DataKey::Issuers, &updated);
 
             env.storage().persistent().remove(&key);
         }
@@ -183,9 +194,7 @@ impl CertificateContract {
         };
 
         // Store the certificate
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id.clone()), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id.clone()), &cert);
 
         // Track cert ID by issuer and owner
         Self::append_cert_id(&env, DataKey::IssuerCertIds(issuer.clone()), id.clone());
@@ -213,9 +222,7 @@ impl CertificateContract {
 
         cert.status = CertificateStatus::Revoked;
         cert.revocation_reason = Some(reason.clone());
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id.clone()), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish revocation event
         env.events().publish(
@@ -226,9 +233,7 @@ impl CertificateContract {
 
     /// Check if a certificate exists
     pub fn certificate_exists(env: Env, id: String) -> bool {
-        env.storage()
-            .persistent()
-            .has(&DataKey::Certificate(id))
+        env.storage().persistent().has(&DataKey::Certificate(id))
     }
 
     /// Get certificate details
@@ -251,9 +256,7 @@ impl CertificateContract {
 
         cert.status = CertificateStatus::Suspended;
         cert.status_reason = Some(reason);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id.clone()), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish suspension event
         env.events().publish(
@@ -276,9 +279,7 @@ impl CertificateContract {
         }
 
         cert.status = CertificateStatus::Active;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id.clone()), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish reinstatement event
         env.events().publish(
@@ -301,9 +302,7 @@ impl CertificateContract {
         }
 
         cert.status = CertificateStatus::Frozen;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id.clone()), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish freeze event
         env.events().publish(
@@ -326,9 +325,7 @@ impl CertificateContract {
         }
 
         cert.status = CertificateStatus::Active;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id.clone()), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id.clone()), &cert);
 
         // Emit and publish unfreeze event
         env.events().publish(
@@ -375,9 +372,7 @@ impl CertificateContract {
         cert.version.minor += 1;
         cert.metadata_uri = new_metadata_uri;
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id), &cert);
     }
 
     /// Reissue a certificate with new version (creates child certificate)
@@ -446,9 +441,7 @@ impl CertificateContract {
         };
 
         // Store new certificate
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(new_id.clone()), &new_cert);
+        Self::set_persistent(&env, &DataKey::Certificate(new_id.clone()), &new_cert);
 
         // Emit issuance event
         env.events().publish(
@@ -518,27 +511,25 @@ impl CertificateContract {
         };
 
         // Store transfer
-        env.storage()
-            .persistent()
-            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+        Self::set_persistent(&env, &DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Add to certificate's transfer history
         let mut transfers = Self::get_transfer_history(&env, certificate_id.clone());
         transfers.push_back(transfer_id.clone());
-        env.storage()
-            .persistent()
-            .set(&DataKey::CertificateTransfers(certificate_id), &transfers);
+        Self::set_persistent(
+            &env,
+            &DataKey::CertificateTransfers(certificate_id),
+            &transfers,
+        );
 
         // Add to pending transfers for new owner
         let mut pending = Self::get_pending_transfers(&env, to_owner.clone());
         pending.push_back(transfer_id.clone());
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingTransfers(to_owner), &pending);
+        Self::set_persistent(&env, &DataKey::PendingTransfers(to_owner), &pending);
 
         // Increment transfer count
         let count = Self::get_transfer_count(&env);
-        env.storage().persistent().set(&DataKey::TransferCount, &(count + 1));
+        Self::set_persistent(&env, &DataKey::TransferCount, &(count + 1));
     }
 
     /// Accept a pending certificate transfer
@@ -564,9 +555,7 @@ impl CertificateContract {
         transfer.status = TransferStatus::Accepted;
         transfer.accepted_at = Some(env.ledger().timestamp());
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+        Self::set_persistent(&env, &DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Remove from pending transfers
         let pending = Self::get_pending_transfers(&env, to_owner.clone());
@@ -576,9 +565,7 @@ impl CertificateContract {
                 updated_pending.push_back(tid);
             }
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingTransfers(to_owner), &updated_pending);
+        Self::set_persistent(&env, &DataKey::PendingTransfers(to_owner), &updated_pending);
     }
 
     /// Complete a certificate transfer (requires original owner auth)
@@ -626,17 +613,17 @@ impl CertificateContract {
             );
         }
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(transfer.certificate_id.clone()), &cert);
+        Self::set_persistent(
+            &env,
+            &DataKey::Certificate(transfer.certificate_id.clone()),
+            &cert,
+        );
 
         // Update transfer status
         transfer.status = TransferStatus::Completed;
         transfer.completed_at = Some(env.ledger().timestamp());
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+        Self::set_persistent(&env, &DataKey::Transfer(transfer_id.clone()), &transfer);
     }
 
     /// Reject a pending certificate transfer
@@ -659,9 +646,7 @@ impl CertificateContract {
 
         transfer.status = TransferStatus::Rejected;
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+        Self::set_persistent(&env, &DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Remove from pending transfers
         let pending = Self::get_pending_transfers(&env, to_owner.clone());
@@ -671,9 +656,7 @@ impl CertificateContract {
                 updated_pending.push_back(tid);
             }
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingTransfers(to_owner), &updated_pending);
+        Self::set_persistent(&env, &DataKey::PendingTransfers(to_owner), &updated_pending);
     }
 
     /// Cancel a pending certificate transfer
@@ -696,9 +679,7 @@ impl CertificateContract {
 
         transfer.status = TransferStatus::Cancelled;
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Transfer(transfer_id.clone()), &transfer);
+        Self::set_persistent(&env, &DataKey::Transfer(transfer_id.clone()), &transfer);
 
         // Remove from pending transfers
         let pending = Self::get_pending_transfers(&env, transfer.to_owner.clone());
@@ -708,9 +689,11 @@ impl CertificateContract {
                 updated_pending.push_back(tid);
             }
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingTransfers(transfer.to_owner), &updated_pending);
+        Self::set_persistent(
+            &env,
+            &DataKey::PendingTransfers(transfer.to_owner),
+            &updated_pending,
+        );
     }
 
     /// Get transfer history for a certificate
@@ -779,7 +762,8 @@ impl CertificateContract {
         {
             panic!("Invalid multisig parameters");
         }
-        env.storage().persistent().set(
+        Self::set_persistent(
+            &env,
             &DataKey::MultisigConfig(issuer.clone()),
             &MultisigConfig {
                 threshold,
@@ -787,9 +771,7 @@ impl CertificateContract {
                 max_signers,
             },
         );
-        env.storage()
-            .persistent()
-            .set(&DataKey::IssuerAdmin(issuer), &admin);
+        Self::set_persistent(&env, &DataKey::IssuerAdmin(issuer), &admin);
     }
 
     pub fn update_multisig_config(
@@ -831,9 +813,7 @@ impl CertificateContract {
             panic!("Invalid updated multisig parameters");
         }
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::MultisigConfig(issuer), &config);
+        Self::set_persistent(&env, &DataKey::MultisigConfig(issuer), &config);
     }
 
     pub fn propose_certificate(
@@ -871,9 +851,7 @@ impl CertificateContract {
             status: RequestStatus::Pending,
         };
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingRequest(request_id.clone()), &request);
+        Self::set_persistent(&env, &DataKey::PendingRequest(request_id.clone()), &request);
 
         Self::append_request_id(&env, DataKey::IssuerRequestIds(issuer), request_id.clone());
 
@@ -894,9 +872,7 @@ impl CertificateContract {
 
         if env.ledger().timestamp() > request.expires_at {
             request.status = RequestStatus::Expired;
-            env.storage()
-                .persistent()
-                .set(&DataKey::PendingRequest(request_id), &request);
+            Self::set_persistent(&env, &DataKey::PendingRequest(request_id), &request);
             return SignatureResult {
                 success: false,
                 message: String::from_str(&env, "Expired"),
@@ -939,9 +915,7 @@ impl CertificateContract {
             request.status = RequestStatus::Approved;
         }
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_persistent(&env, &DataKey::PendingRequest(request_id), &request);
         SignatureResult {
             success: true,
             message: String::from_str(&env, "Approved"),
@@ -991,9 +965,7 @@ impl CertificateContract {
             request.status = RequestStatus::Rejected;
         }
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_persistent(&env, &DataKey::PendingRequest(request_id), &request);
         SignatureResult {
             success: true,
             message: String::from_str(&env, "Rejected"),
@@ -1022,9 +994,7 @@ impl CertificateContract {
         );
 
         request.status = RequestStatus::Issued;
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_persistent(&env, &DataKey::PendingRequest(request_id), &request);
         true
     }
 
@@ -1117,9 +1087,7 @@ impl CertificateContract {
             panic!("Only proposer can cancel");
         }
         request.status = RequestStatus::Rejected;
-        env.storage()
-            .persistent()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_persistent(&env, &DataKey::PendingRequest(request_id), &request);
         true
     }
 
@@ -1137,10 +1105,13 @@ impl CertificateContract {
             .storage()
             .persistent()
             .get(&DataKey::ContractVersion)
-            .unwrap_or(ContractVersion { version: 0, last_wasm_hash: new_wasm_hash.clone() });
+            .unwrap_or(ContractVersion {
+                version: 0,
+                last_wasm_hash: new_wasm_hash.clone(),
+            });
         ver.version += 1;
         ver.last_wasm_hash = new_wasm_hash.clone();
-        env.storage().persistent().set(&DataKey::ContractVersion, &ver);
+        Self::set_persistent(&env, &DataKey::ContractVersion, &ver);
 
         env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
@@ -1232,9 +1203,7 @@ impl CertificateContract {
             .expect("Certificate not found");
 
         cert.expires_at = Some(expiry_time);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Certificate(id), &cert);
+        Self::set_persistent(&env, &DataKey::Certificate(id), &cert);
     }
 
     /// Get certificate expiry time
@@ -1329,7 +1298,7 @@ impl CertificateContract {
             .unwrap_or(Vec::<String>::new(env));
         if !ids.contains(&cert_id) {
             ids.push_back(cert_id);
-            env.storage().persistent().set(&key, &ids);
+            Self::set_persistent(env, &key, &ids);
         }
     }
 
@@ -1338,7 +1307,7 @@ impl CertificateContract {
 
         if !request_ids.contains(&request_id) {
             request_ids.push_back(request_id);
-            env.storage().persistent().set(&key, &request_ids);
+            Self::set_persistent(env, &key, &request_ids);
         }
     }
 
@@ -1380,7 +1349,10 @@ impl CertificateContract {
         }
 
         // Page is 1-indexed. Calculate start index (0-indexed)
-        let start = pagination.page.saturating_sub(1).saturating_mul(pagination.limit);
+        let start = pagination
+            .page
+            .saturating_sub(1)
+            .saturating_mul(pagination.limit);
         let end = total.min(start.saturating_add(pagination.limit));
 
         let mut index = start;

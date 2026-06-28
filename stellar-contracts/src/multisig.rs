@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, IntoVal, String, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, IntoVal, String, Symbol, Val, Vec};
 
 use crate::{
     DataKey, MultisigConfig, OptionalRequestStatus, PaginatedResult, Pagination, PendingRequest,
@@ -10,6 +10,15 @@ pub struct MultisigCertificateContract;
 
 #[contractimpl]
 impl MultisigCertificateContract {
+    fn set_instance<K, V>(env: &Env, key: &K, value: &V)
+    where
+        K: IntoVal<Env, Val>,
+        V: IntoVal<Env, Val>,
+    {
+        env.storage().instance().set(key, value);
+        crate::persistent::extend_instance_ttl(env, None);
+    }
+
     /// Initialize multisig configuration for an issuer
     pub fn init_multisig_config(
         env: Env,
@@ -41,7 +50,8 @@ impl MultisigCertificateContract {
         }
 
         // Store configuration
-        env.storage().instance().set(
+        Self::set_instance(
+            &env,
             &DataKey::MultisigConfig(issuer.clone()),
             &MultisigConfig {
                 threshold,
@@ -51,9 +61,7 @@ impl MultisigCertificateContract {
         );
 
         // Store admin for this issuer
-        env.storage()
-            .instance()
-            .set(&DataKey::IssuerAdmin(issuer), &admin);
+        Self::set_instance(&env, &DataKey::IssuerAdmin(issuer), &admin);
     }
 
     /// Update multisig configuration
@@ -98,9 +106,7 @@ impl MultisigCertificateContract {
             panic!("Invalid updated multisig parameters");
         }
 
-        env.storage()
-            .instance()
-            .set(&DataKey::MultisigConfig(issuer), &config);
+        Self::set_instance(&env, &DataKey::MultisigConfig(issuer), &config);
     }
 
     /// Get multisig configuration for an issuer
@@ -149,9 +155,7 @@ impl MultisigCertificateContract {
             status: RequestStatus::Pending,
         };
 
-        env.storage()
-            .instance()
-            .set(&DataKey::PendingRequest(request_id.clone()), &request);
+        Self::set_instance(&env, &DataKey::PendingRequest(request_id.clone()), &request);
 
         Self::append_request_id(&env, DataKey::IssuerRequestIds(issuer), request_id.clone());
 
@@ -175,9 +179,7 @@ impl MultisigCertificateContract {
         // Check if request has expired
         if env.ledger().timestamp() > request.expires_at {
             request.status = RequestStatus::Expired;
-            env.storage()
-                .instance()
-                .set(&DataKey::PendingRequest(request_id), &request);
+            Self::set_instance(&env, &DataKey::PendingRequest(request_id), &request);
             return SignatureResult {
                 success: false,
                 message: String::from_str(&env, "Request has expired"),
@@ -227,9 +229,7 @@ impl MultisigCertificateContract {
             request.status = RequestStatus::Approved;
         }
 
-        env.storage()
-            .instance()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_instance(&env, &DataKey::PendingRequest(request_id), &request);
 
         SignatureResult {
             success: true,
@@ -301,9 +301,7 @@ impl MultisigCertificateContract {
             request.status = RequestStatus::Rejected;
         }
 
-        env.storage()
-            .instance()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_instance(&env, &DataKey::PendingRequest(request_id), &request);
 
         SignatureResult {
             success: true,
@@ -347,17 +345,13 @@ impl MultisigCertificateContract {
         );
 
         request.status = RequestStatus::Issued;
-        env.storage()
-            .instance()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_instance(&env, &DataKey::PendingRequest(request_id), &request);
         true
     }
 
     pub fn set_certificate_contract(env: Env, admin: Address, certificate_contract: Address) {
         admin.require_auth();
-        env.storage()
-            .instance()
-            .set(&DataKey::CertificateContract, &certificate_contract);
+        Self::set_instance(&env, &DataKey::CertificateContract, &certificate_contract);
     }
 
     pub fn get_certificate_contract(env: Env) -> Address {
@@ -404,9 +398,7 @@ impl MultisigCertificateContract {
         }
 
         request.status = RequestStatus::Cancelled;
-        env.storage()
-            .instance()
-            .set(&DataKey::PendingRequest(request_id), &request);
+        Self::set_instance(&env, &DataKey::PendingRequest(request_id), &request);
         true
     }
 
@@ -441,7 +433,7 @@ impl MultisigCertificateContract {
 
         if !request_ids.contains(&request_id) {
             request_ids.push_back(request_id);
-            env.storage().instance().set(&key, &request_ids);
+            Self::set_instance(env, &key, &request_ids);
         }
     }
 
@@ -485,7 +477,10 @@ impl MultisigCertificateContract {
         }
 
         // Page is 1-indexed. Calculate start index (0-indexed)
-        let start = pagination.page.saturating_sub(1).saturating_mul(pagination.limit);
+        let start = pagination
+            .page
+            .saturating_sub(1)
+            .saturating_mul(pagination.limit);
         let end = total.min(start.saturating_add(pagination.limit));
 
         let mut index = start;

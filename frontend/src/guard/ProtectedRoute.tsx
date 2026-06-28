@@ -11,6 +11,17 @@ const roleRoutes: Record<UserRole, string[]> = {
   [UserRole.USER]: ["/wallet"],
 };
 
+/**
+ * Paths that never require authentication.
+ *
+ * Membership is tested by **exact** string equality (Set lookup), never by
+ * prefix. Listing `/verify` here therefore cannot make a future `/verify-*`
+ * route (e.g. `/verify-email`, `/verify-payment`) public by accident — such a
+ * route falls through to the normal auth/role checks unless it is added here
+ * explicitly.
+ */
+const PUBLIC_PATHS: ReadonlySet<string> = new Set(["/verify"]);
+
 interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
 }
@@ -19,8 +30,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
   const { user } = useAuth();
   const location = useLocation();
 
-  // Public path — no auth required
-  if (location.pathname === "/verify") return <Outlet />;
+  // Public paths require no auth. Exact match only — see PUBLIC_PATHS.
+  if (PUBLIC_PATHS.has(location.pathname)) return <Outlet />;
 
   // Not logged in — redirect to login and preserve destination
   if (!user) {

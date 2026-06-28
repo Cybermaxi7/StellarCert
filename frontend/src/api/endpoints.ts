@@ -288,7 +288,7 @@ export const fetchUserByEmail = async (email: string): Promise<User | null> => {
   if (USE_DUMMY_DATA) {
     await simulateDelay();
     const user = dummyData.users.find((user) => user.email === email);
-    
+
     return user || null;
   }
 
@@ -801,7 +801,7 @@ export const certificateApi = {
 
     return apiClient<Certificate>(`/certificates/${certificateId}/freeze`, {
       method: "PATCH",
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason, durationDays }),
     });
   },
   unfreeze: async (certificateId: string): Promise<Certificate> => {
@@ -824,7 +824,7 @@ export const certificateApi = {
     });
   },
   getQR: getCertificateQR,
-  
+
   // Certificate Transfer API (#286)
   transfer: {
     initiate: async (data: InitiateTransferDto): Promise<CertificateTransfer> => {

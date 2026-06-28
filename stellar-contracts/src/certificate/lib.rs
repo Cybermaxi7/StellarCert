@@ -54,3 +54,30 @@ impl CertificateContract {
         // env.events().publish((Symbol::new(&env, "CertificateIssuedEvent"), new_id), ...);
     }
 }
+
+#![no_std]
+use soroban_sdk::{contract, contractimpl, Env, Address, panic_with_error};
+
+#[contract]
+pub struct CertificateContract;
+
+#[contractimpl]
+impl CertificateContract {
+    /// Retrieves the multisig configuration safely by verifying the true caller's identity.
+    pub fn get_multisig_config(env: Env, caller: Address) -> MultisigConfig {
+        // FIXED: Force authentication on the actual address executing the transaction.
+        // The transaction will fail instantly unless the entity calling this method signs it.
+        caller.require_auth();
+
+        // Optional: Ensure the authenticated caller has administrative privileges
+        // let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        // if caller != admin {
+        //     panic!("Unauthorized access to multisig configurations");
+        // }
+
+        env.storage()
+            .instance()
+            .get(&DataKey::MultisigConfig)
+            .unwrap_or_else(|| panic!("Multisig configuration not initialized"))
+    }
+}

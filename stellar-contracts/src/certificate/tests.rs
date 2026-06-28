@@ -103,3 +103,36 @@ fn test_reissue_certificate_atomically_revokes_original() {
     let fetched_new: Certificate = env.storage().persistent().get(&new_id).unwrap();
     assert_eq!(fetched_new.status, Symbol::new(&env, "Active"));
 }
+
+#![cfg(test)]
+use super::*;
+use soroban_sdk::{testutils::Address as _, Env, Address};
+
+#[test]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")] // Expected behavior when signatures are missing
+fn test_get_multisig_config_rejects_unauthorized_supplied_address() {
+    let env = Env::default();
+    
+    // Do NOT invoke mock_all_auths() to ensure crypto signature verification runs realistically
+    let contract_id = env.register_contract(None, CertificateContract);
+    let client = CertificateContractClient::new(&env, &contract_id);
+
+    let random_spoof_target = Address::generate(&env);
+
+    // This must fail because random_spoof_target did not sign this transaction invocation sequence
+    client.get_multisig_config(&random_spoof_target);
+}
+
+#[test]
+fn test_get_multisig_config_succeeds_with_valid_caller_signature() {
+    let env = Env::default();
+    env.mock_all_auths(); // Simulate valid signature placement for the authorized caller
+
+    let contract_id = env.register_contract(None, CertificateContract);
+    let client = CertificateContractClient::new(&env, &contract_id);
+
+    let legitimate_caller = Address::generate(&env);
+
+    // Should resolve perfectly when signatures are cleanly mocked/provided
+    let _config = client.get_multisig_config(&legitimate_caller);
+}

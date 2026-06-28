@@ -1,12 +1,20 @@
+import type { User } from './types';
+
 const ACCESS_TOKEN_KEY = 'accessToken';
 
-// Called by apiClient after a silent token refresh so AuthContext can stay in sync.
-let _onTokenRefreshed: ((accessToken: string) => void) | null = null;
-export const setTokenRefreshCallback = (cb: (accessToken: string) => void) => {
+/**
+ * Callback invoked after `apiClient` silently refreshes the access token, so
+ * AuthContext can keep its reactive `isAuthenticated` / `user` state in sync.
+ * The fresh `user` from the refresh response is forwarded when available.
+ */
+type TokenRefreshCallback = (accessToken: string, user?: User | null) => void;
+
+let _onTokenRefreshed: TokenRefreshCallback | null = null;
+export const setTokenRefreshCallback = (cb: TokenRefreshCallback) => {
   _onTokenRefreshed = cb;
 };
-export const notifyTokenRefreshed = (accessToken: string) => {
-  _onTokenRefreshed?.(accessToken);
+export const notifyTokenRefreshed = (accessToken: string, user?: User | null) => {
+  _onTokenRefreshed?.(accessToken, user);
 };
 
 export const tokenStorage = {

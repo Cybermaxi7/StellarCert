@@ -4,8 +4,9 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  Version,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from '../auth.service';
 import { LoginDto } from '../dto/login.dto';
@@ -13,14 +14,15 @@ import { RegisterDto } from '../dto/register.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { Public } from '../../../common/decorators/public.decorator';
 
-/**
- * Version 2 of the Authentication API
- *
- * Changes from V1:
- * - Enhanced response with additional metadata
- * - Improved error handling
- * - Support for refresh tokens
- */
+const REFRESH_COOKIE = 'refreshToken';
+const refreshCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: '/',
+});
+
 @ApiTags('Authentication v2')
 @Controller({ path: 'auth', version: '2' })
 export class AuthV2Controller {
@@ -31,18 +33,23 @@ export class AuthV2Controller {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login user (v2) - Enhanced with metadata' })
   @ApiResponse({ status: HttpStatus.OK, type: AuthResponseDto })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Omit<AuthResponseDto, 'refreshToken'>> {
     const result = await this.authService.login(loginDto);
-
-    // V2 enhancement: Add metadata
+    if (!('requires2FA' in result) && result.refreshToken) {
+      res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions());
+    }
+    const { refreshToken: _, ...response } = result;
     return {
-      ...result,
+      ...response,
       metadata: {
         version: '2',
         timestamp: new Date().toISOString(),
         expiresIn: 3600,
       },
-    };
+    } as Omit<AuthResponseDto, 'refreshToken'>;
   }
 
   @Post('register')
@@ -50,12 +57,17 @@ export class AuthV2Controller {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register new user (v2) - Enhanced with metadata' })
   @ApiResponse({ status: HttpStatus.CREATED, type: AuthResponseDto })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Omit<AuthResponseDto, 'refreshToken'>> {
     const result = await this.authService.register(registerDto);
-
-    // V2 enhancement: Add metadata
+    if (result.refreshToken) {
+      res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions());
+    }
+    const { refreshToken: _, ...response } = result;
     return {
-      ...result,
+      ...response,
       metadata: {
         version: '2',
         timestamp: new Date().toISOString(),

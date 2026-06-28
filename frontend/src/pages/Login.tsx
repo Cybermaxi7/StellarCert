@@ -48,7 +48,7 @@ const Login = () => {
           email: formData.email,
           password: formData.password,
         });
-        login(regRes.accessToken, regRes.refreshToken, regRes.user);
+        login(regRes.accessToken, regRes.user);
         navigate(returnUrl, { replace: true });
         return;
       }
@@ -56,7 +56,7 @@ const Login = () => {
       setLoadingPhase("logging-in");
       const res = await authApi.login({ email: formData.email, password: formData.password });
       if (res.accessToken) {
-        login(res.accessToken, res.refreshToken, res.user);
+        login(res.accessToken, res.user);
         navigate(returnUrl, { replace: true });
       }
     } catch (err: unknown) {

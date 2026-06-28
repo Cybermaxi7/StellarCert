@@ -102,12 +102,27 @@ impl CRLContract {
 
     pub fn revoke_certificate(
         env: Env,
+        authorizer: Address,
         certificate_id: String,
         reason: RevocationReason,
         _serial_number: Option<String>,
     ) {
         let issuer = Self::get_issuer(&env);
-        issuer.require_auth();
+        // Allow either the configured issuer or an admin to authorize revocations
+        let mut authorized = false;
+        if authorizer == issuer {
+            authorized = true;
+        } else if let Some(admin) = Self::get_admin(&env) {
+            if authorizer == admin {
+                authorized = true;
+            }
+        }
+
+        if !authorized {
+            panic!("Only issuer or admin can revoke");
+        }
+
+        authorizer.require_auth();
 
         // Verify the certificate exists in the CertificateContract (#414)
         let cert_contract: Address = env
@@ -135,7 +150,7 @@ impl CRLContract {
             reason: reason as u32,
             issuer: issuer.clone(),
             revocation_date: env.ledger().timestamp(),
-            revoked_by: issuer.clone(),
+            revoked_by: authorizer.clone(),
         };
 
         Self::set_persistent(&env, &revocation_key, &revocation_info);
@@ -252,6 +267,10 @@ impl CRLContract {
             .persistent()
             .get(&DataKey::Info)
             .expect("CRL info not found")
+    }
+
+    fn get_admin(env: &Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::Admin)
     }
 
     fn get_revoked_certificate_ids(env: &Env) -> Vec<String> {

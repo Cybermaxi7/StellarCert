@@ -4,14 +4,24 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  Version,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from '../auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { RegisterDto } from '../dto/register.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { Public } from '../../../common/decorators/public.decorator';
+
+const REFRESH_COOKIE = 'refreshToken';
+const refreshCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: '/',
+});
 
 @ApiTags('Authentication v1')
 @Controller({ path: 'auth', version: '1' })
@@ -23,8 +33,16 @@ export class AuthV1Controller {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login user (v1)' })
   @ApiResponse({ status: HttpStatus.OK, type: AuthResponseDto })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Omit<AuthResponseDto, 'refreshToken'>> {
+    const result = await this.authService.login(loginDto);
+    if (!('requires2FA' in result) && result.refreshToken) {
+      res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions());
+    }
+    const { refreshToken: _, ...response } = result;
+    return response as Omit<AuthResponseDto, 'refreshToken'>;
   }
 
   @Post('register')
@@ -32,7 +50,15 @@ export class AuthV1Controller {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register new user (v1)' })
   @ApiResponse({ status: HttpStatus.CREATED, type: AuthResponseDto })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
-    return this.authService.register(registerDto);
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Omit<AuthResponseDto, 'refreshToken'>> {
+    const result = await this.authService.register(registerDto);
+    if (result.refreshToken) {
+      res.cookie(REFRESH_COOKIE, result.refreshToken, refreshCookieOptions());
+    }
+    const { refreshToken: _, ...response } = result;
+    return response;
   }
 }

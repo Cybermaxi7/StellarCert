@@ -79,7 +79,7 @@ fn test_revoke_certificate() {
     env.mock_all_auths();
 
     let cert_id = String::from_str(&env, "CERT-001");
-    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
+    client.revoke_certificate(&issuer, &cert_id, &RevocationReason::KeyCompromise, &None);
 
     assert!(client.is_revoked(&cert_id));
 
@@ -112,8 +112,8 @@ fn test_duplicate_revocation_panics() {
     client.initialize(&issuer, &cert_contract);
 
     let cert_id = String::from_str(&env, "CERT-001");
-    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
-    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
+    client.revoke_certificate(&issuer, &cert_id, &RevocationReason::KeyCompromise, &None);
+    client.revoke_certificate(&issuer, &cert_id, &RevocationReason::KeyCompromise, &None);
 }
 
 #[test]
@@ -126,9 +126,9 @@ fn test_revoke_multiple_certificates() {
     let cert2 = String::from_str(&env, "CERT-002");
     let cert3 = String::from_str(&env, "CERT-003");
 
-    client.revoke_certificate(&cert1, &RevocationReason::KeyCompromise, &None);
-    client.revoke_certificate(&cert2, &RevocationReason::CACompromise, &None);
-    client.revoke_certificate(&cert3, &RevocationReason::Superseded, &None);
+    client.revoke_certificate(&issuer, &cert1, &RevocationReason::KeyCompromise, &None);
+    client.revoke_certificate(&issuer, &cert2, &RevocationReason::CACompromise, &None);
+    client.revoke_certificate(&issuer, &cert3, &RevocationReason::Superseded, &None);
 
     assert!(client.is_revoked(&cert1));
     assert!(client.is_revoked(&cert2));
@@ -158,7 +158,7 @@ fn test_verify_certificate_after_revocation() {
     client.initialize(&issuer, &cert_contract);
 
     let cert_id = String::from_str(&env, "CERT-001");
-    client.revoke_certificate(&cert_id, &RevocationReason::KeyCompromise, &None);
+    client.revoke_certificate(&issuer, &cert_id, &RevocationReason::KeyCompromise, &None);
 
     let (is_revoked, crl_number) = client.verify_certificate(&cert_id);
     assert!(is_revoked);
@@ -187,6 +187,7 @@ fn test_merkle_root_changes_on_revocation() {
     let root_before = client.get_merkle_root();
 
     client.revoke_certificate(
+        &issuer,
         &String::from_str(&env, "CERT-001"),
         &RevocationReason::KeyCompromise,
         &None,
@@ -195,6 +196,7 @@ fn test_merkle_root_changes_on_revocation() {
     assert_ne!(root_before, root_after_one);
 
     client.revoke_certificate(
+        &issuer,
         &String::from_str(&env, "CERT-002"),
         &RevocationReason::KeyCompromise,
         &None,
@@ -221,8 +223,8 @@ fn test_merkle_root_is_deterministic() {
     let ids = ["ALPHA", "BETA", "GAMMA"];
     for id in ids {
         let s = String::from_str(&env, id);
-        client_a.revoke_certificate(&s, &RevocationReason::KeyCompromise, &None);
-        client_b.revoke_certificate(&s, &RevocationReason::KeyCompromise, &None);
+        client_a.revoke_certificate(&issuer, &s, &RevocationReason::KeyCompromise, &None);
+        client_b.revoke_certificate(&issuer2, &s, &RevocationReason::KeyCompromise, &None);
     }
 
     assert_eq!(client_a.get_merkle_root(), client_b.get_merkle_root());
@@ -238,12 +240,13 @@ fn test_merkle_root_odd_number_of_leaves() {
 
     for i in 0u32..3 {
         let s = soroban_sdk::String::from_str(&env, &["ID-", &i.to_string()].concat());
-        client.revoke_certificate(&s, &RevocationReason::Superseded, &None);
+        client.revoke_certificate(&issuer, &s, &RevocationReason::Superseded, &None);
     }
     let root_odd = client.get_merkle_root();
     assert_eq!(root_odd.len(), 64);
 
     client.revoke_certificate(
+        &issuer,
         &String::from_str(&env, "ID-3"),
         &RevocationReason::Superseded,
         &None,
@@ -263,7 +266,7 @@ fn test_get_revoked_certificates_pagination() {
 
     for i in 0u32..7 {
         let s = soroban_sdk::String::from_str(&env, &["CERT-", &i.to_string()].concat());
-        client.revoke_certificate(&s, &RevocationReason::KeyCompromise, &None);
+        client.revoke_certificate(&issuer, &s, &RevocationReason::KeyCompromise, &None);
     }
 
     let page0 = client.get_revoked_certificates(&0, &3);
@@ -286,6 +289,7 @@ fn test_get_revoked_certificates_zero_limit() {
     client.initialize(&issuer, &cert_contract);
 
     client.revoke_certificate(
+        &issuer,
         &String::from_str(&env, "CERT-001"),
         &RevocationReason::KeyCompromise,
         &None,
@@ -347,6 +351,11 @@ fn test_set_admin_allows_revocation() {
 
     // Admin should now be able to revoke (auth is mocked for all)
     let cert_id = String::from_str(&env, "CERT-001");
-    client.revoke_certificate(&cert_id, &RevocationReason::AffiliationChanged, &None);
+    client.revoke_certificate(
+        &admin,
+        &cert_id,
+        &RevocationReason::AffiliationChanged,
+        &None,
+    );
     assert!(client.is_revoked(&cert_id));
 }

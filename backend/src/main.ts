@@ -11,6 +11,7 @@ import { SecurityHeadersInterceptor } from './modules/security/interceptor';
 import { VersioningType } from '@nestjs/common';
 import { RequestValidationPipe } from './modules/security/pipes/request-validation.pipe';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,6 +30,7 @@ async function bootstrap() {
   const requestLimit = process.env.REQUEST_SIZE_LIMIT || '1mb';
   app.use(express.json({ limit: requestLimit }));
   app.use(express.urlencoded({ extended: true, limit: requestLimit }));
+  app.use(cookieParser());
 
   // Enable CORS
   const allowedOrigins = (

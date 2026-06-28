@@ -75,16 +75,11 @@ const handleError = (error: unknown, endpointName: string): never => {
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Refresh tokens using the stored refresh token
+ * Refresh tokens using the HttpOnly cookie sent automatically by the browser.
  */
 const refreshTokens = async (): Promise<AuthResponse> => {
-  const refreshToken = tokenStorage.getRefreshToken();
-  if (!refreshToken) {
-    throw new Error('No refresh token available');
-  }
   return apiClient<AuthResponse>('/auth/refresh', {
     method: 'POST',
-    body: JSON.stringify({ refreshToken }),
     skipAuth: true,
   });
 };
@@ -138,6 +133,7 @@ export async function apiClient<T>(
       const response = await fetch(url, {
         ...options,
         headers,
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -150,9 +146,6 @@ export async function apiClient<T>(
           try {
             const refreshResponse = await refreshTokens();
             tokenStorage.setAccessToken(refreshResponse.accessToken);
-            if (refreshResponse.refreshToken) {
-              tokenStorage.setRefreshToken(refreshResponse.refreshToken);
-            }
             notifyTokenRefreshed(refreshResponse.accessToken);
             // Retry the original request with hasTriedRefresh = true
             return attemptRequest(attempt, true);
@@ -866,7 +859,6 @@ export const loginApi = async (
         refreshToken: "dummy-refresh-token",
       };
       tokenStorage.setAccessToken(response.accessToken);
-      // Note: refreshToken is handled server-side via httpOnly cookies
       return response;
     }
     throw new Error("Invalid credentials");
@@ -879,9 +871,6 @@ export const loginApi = async (
       skipAuth: true,
     });
     tokenStorage.setAccessToken(response.accessToken);
-    if (response.refreshToken) {
-      tokenStorage.setRefreshToken(response.refreshToken);
-    }
     return response;
   } catch (error) {
     return handleError(error, "loginApi");
@@ -909,7 +898,6 @@ export const registerApi = async (
       refreshToken: "dummy-refresh-token",
     };
     tokenStorage.setAccessToken(response.accessToken);
-    // Note: refreshToken is handled server-side via httpOnly cookies
     return response;
   }
 
@@ -925,12 +913,9 @@ export const registerApi = async (
       skipAuth: true,
     });
     // Registration requires email verification before login is allowed.
-    // Store tokens so the UI can show the "check your email" state.
+    // Store access token so the UI can show the "check your email" state.
     if (response.accessToken) {
       tokenStorage.setAccessToken(response.accessToken);
-    }
-    if (response.refreshToken) {
-      tokenStorage.setRefreshToken(response.refreshToken);
     }
     return response;
   } catch (error) {
@@ -942,13 +927,8 @@ export const authApi = {
   login: loginApi,
   register: registerApi,
   refresh: async (): Promise<AuthResponse> => {
-    const refreshToken = tokenStorage.getRefreshToken();
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
     return apiClient<AuthResponse>('/auth/refresh', {
       method: 'POST',
-      body: JSON.stringify({ refreshToken }),
       skipAuth: true,
     });
   },

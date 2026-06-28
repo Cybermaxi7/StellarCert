@@ -51,12 +51,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/verify" element={<VerifyCertificate />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/profile" element={<IssuerProfile />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                <Route
-                  path="/preferences"
-                  element={<NotificationPreferences />}
-                />
 
                 <Route
                   element={
@@ -85,6 +80,28 @@ function App() {
                   <Route
                     path="/certificates"
                     element={<CertificateManagementPage />}
+                  />
+                </Route>
+
+                {/* Account routes — any authenticated user, regardless of role */}
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={[
+                        UserRole.RECIPIENT,
+                        UserRole.VERIFIER,
+                        UserRole.ISSUER,
+                        UserRole.ADMIN,
+                        UserRole.AUDITOR,
+                        UserRole.USER,
+                      ]}
+                    />
+                  }
+                >
+                  <Route path="/profile" element={<IssuerProfile />} />
+                  <Route
+                    path="/preferences"
+                    element={<NotificationPreferences />}
                   />
                 </Route>
 

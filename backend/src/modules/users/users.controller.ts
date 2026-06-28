@@ -117,6 +117,7 @@ export class UsersController {
     return { message: 'Logged out successfully' };
   }
 
+  @Public()
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })

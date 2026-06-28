@@ -1354,7 +1354,7 @@ impl CertificateContract {
         request_ids: Vec<String>,
         pagination: Pagination,
     ) -> PaginatedResult {
-        let mut pending_requests = Vec::<PendingRequest>::new(env);
+        let mut all_requests = Vec::<PendingRequest>::new(env);
 
         for request_id in request_ids.iter() {
             if let Some(request) = env
@@ -1362,13 +1362,11 @@ impl CertificateContract {
                 .persistent()
                 .get::<_, PendingRequest>(&DataKey::PendingRequest(request_id))
             {
-                if request.status == RequestStatus::Pending {
-                    pending_requests.push_back(request);
-                }
+                all_requests.push_back(request);
             }
         }
 
-        let total = pending_requests.len();
+        let total = all_requests.len();
         let mut page_data = Vec::<PendingRequest>::new(env);
 
         if pagination.limit == 0 {
@@ -1387,7 +1385,7 @@ impl CertificateContract {
 
         let mut index = start;
         while index < end {
-            if let Some(request) = pending_requests.get(index) {
+            if let Some(request) = all_requests.get(index) {
                 page_data.push_back(request);
             }
             index += 1;

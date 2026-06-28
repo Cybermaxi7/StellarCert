@@ -1,30 +1,32 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, Env, String, Symbol, Address};
-
-// ... Other contract types (e.g., Certificate struct) ...
+use soroban_sdk::{contract, contractimpl, Env, String, Symbol, Address};
 
 #[contract]
 pub struct CertificateContract;
 
 #[contractimpl]
 impl CertificateContract {
-    /// Suspends an active certificate and emits an audit-compliant event containing the reason.
-    pub fn suspend_certificate(env: Env, admin: Address, certificate_id: String, reason: String) {
+    /// Mutates the off-chain metadata URI reference pointer for a certificate and broadcasts an event.
+    pub fn update_certificate_metadata(
+        env: Env, 
+        admin: Address, 
+        certificate_id: String, 
+        new_metadata_uri: String
+    ) {
         admin.require_auth();
 
-        // 1. (Your existing logic) Fetch, mutate, and update the certificate state in storage
+        // 1. (Your existing logic) Fetch state from storage, update URI data, and persist changes
         // let mut cert = env.storage().persistent().get(&certificate_id)...
-        // cert.is_suspended = true;
-        // cert.suspension_reason = reason.clone();
+        // cert.metadata_uri = new_metadata_uri.clone();
         // env.storage().persistent().set(&certificate_id, &cert);
 
-        // 2. UPDATED: Emit the event with both certificate_id AND the reason payload
+        // 2. FIXED: Emit event so off-chain webhook processors and indexers can capture mutations
         env.events().publish(
             (
-                Symbol::new(&env, "CertificateSuspendedEvent"), 
+                Symbol::new(&env, "CertificateMetadataUpdatedEvent"), 
                 certificate_id
             ), // Event Topics (Indexable)
-            reason // Event Data Payload
+            new_metadata_uri // Event Data Payload (The updated content URI pointer)
         );
     }
 }

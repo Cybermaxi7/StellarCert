@@ -377,8 +377,12 @@ export class CertificateController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ISSUER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Freeze certificate' })
-  async freeze(@Param('id') id: string, @Body('reason') reason?: string) {
-    return this.certificateService.freeze(id, reason);
+  async freeze(
+    @Param('id') id: string,
+    @Body('reason') reason?: string,
+    @Body('durationDays') durationDays?: number,
+  ) {
+    return this.certificateService.freeze(id, reason, durationDays);
   }
 
   @Patch(':id/unfreeze')

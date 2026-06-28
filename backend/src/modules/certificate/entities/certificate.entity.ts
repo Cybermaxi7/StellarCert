@@ -30,6 +30,8 @@ export interface CertificateMetadata {
   revokedAt?: Date;
   freezeReason?: string;
   frozenAt?: Date;
+  freezeDurationDays?: number;
+  unfreezeAt?: Date;
   unfreezeReason?: string;
   unfrozenAt?: Date;
   additionalFields?: Record<string, unknown>;

@@ -54,7 +54,11 @@ export class CertificateRevocationService {
     return savedCertificate;
   }
 
-  async freeze(id: string, reason?: string): Promise<Certificate> {
+  async freeze(
+    id: string,
+    reason?: string,
+    durationDays?: number,
+  ): Promise<Certificate> {
     const certificate = await this.certificateRepository.findOne({
       where: { id },
     });
@@ -69,14 +73,23 @@ export class CertificateRevocationService {
       );
     }
 
+    const frozenAt = new Date();
+    const normalizedDurationDays =
+      typeof durationDays === 'number' && Number.isFinite(durationDays)
+        ? Math.max(1, Math.trunc(durationDays))
+        : undefined;
+    const unfreezeAt = normalizedDurationDays
+      ? new Date(frozenAt.getTime() + normalizedDurationDays * 24 * 60 * 60 * 1000)
+      : undefined;
+
     certificate.status = CertificateStatus.FROZEN;
-    if (reason) {
-      certificate.metadata = {
-        ...certificate.metadata,
-        freezeReason: reason,
-        frozenAt: new Date(),
-      };
-    }
+    certificate.metadata = {
+      ...certificate.metadata,
+      ...(reason ? { freezeReason: reason } : {}),
+      frozenAt,
+      ...(normalizedDurationDays ? { freezeDurationDays: normalizedDurationDays } : {}),
+      ...(unfreezeAt ? { unfreezeAt } : {}),
+    };
 
     const savedCertificate = await this.certificateRepository.save(certificate);
 
@@ -89,8 +102,10 @@ export class CertificateRevocationService {
       {
         id: savedCertificate.id,
         status: savedCertificate.status,
-        freezeReason: reason,
-        frozenAt: new Date(),
+        ...(reason ? { freezeReason: reason } : {}),
+        frozenAt,
+        ...(normalizedDurationDays ? { freezeDurationDays: normalizedDurationDays } : {}),
+        ...(unfreezeAt ? { unfreezeAt } : {}),
       },
     );
 

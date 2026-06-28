@@ -1,6 +1,9 @@
 #![cfg(test)]
 use super::multisig::*;
-use crate::{CertificateContract, CertificateContractClient, OptionalRequestStatus, Pagination, RequestStatus};
+use crate::{
+    CertificateContract, CertificateContractClient, OptionalRequestStatus, Pagination,
+    RequestStatus,
+};
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
 
 #[test]
@@ -224,7 +227,7 @@ fn test_issue_approved_certificate() {
 
     // Configure the external certificate contract and register the issuer
     let certificate_contract_id = env.register_contract(None, CertificateContract);
-    let certificate_contract_address = Address::Contract(certificate_contract_id.clone());
+    let certificate_contract_address = certificate_contract_id.clone();
     let certificate_client = CertificateContractClient::new(&env, &certificate_contract_id);
     certificate_client.initialize(&admin);
     certificate_client.add_issuer(&issuer);
@@ -271,7 +274,7 @@ fn test_cancel_request() {
 
     // Check the request status
     let request = client.get_pending_request(&request_id);
-    assert_eq!(request.status, RequestStatus::Rejected); // Using Rejected as cancelled
+    assert_eq!(request.status, RequestStatus::Cancelled);
 }
 
 #[test]

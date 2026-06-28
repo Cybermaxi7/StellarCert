@@ -1,19 +1,27 @@
 #![cfg(test)]
 
+extern crate std;
+
 use super::crl::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
+use std::string::ToString;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+#[contract]
+struct CertificateExistsStub;
+
+#[contractimpl]
+impl CertificateExistsStub {
+    pub fn certificate_exists(_env: Env, _id: String) -> bool {
+        true
+    }
+}
 
 /// Register a minimal stub that satisfies `certificate_exists` cross-contract
 /// calls made by `revoke_certificate`.
 fn register_cert_stub(env: &Env) -> Address {
-    // The CRL contract calls `certificate_exists(id) -> bool` on the cert
-    // contract.  In the test environment we use `mock_all_auths_allowing_non_root_auth`
-    // together with `env.mock_all_auths()` so cross-contract calls are
-    // intercepted.  We register a second CRLContract address purely to have a
-    // valid `Address`; the call will be mocked to return `true`.
-    env.register_contract(None, CRLContract)
+    env.register_contract(None, CertificateExistsStub)
 }
 
 fn setup() -> (Env, Address, Address) {
@@ -24,7 +32,7 @@ fn setup() -> (Env, Address, Address) {
     (env, issuer, cert_contract)
 }
 
-fn make_client(env: &Env) -> (Address, CRLContractClient) {
+fn make_client(env: &Env) -> (Address, CRLContractClient<'_>) {
     let contract_id = env.register_contract(None, CRLContract);
     let client = CRLContractClient::new(env, &contract_id);
     (contract_id, client)

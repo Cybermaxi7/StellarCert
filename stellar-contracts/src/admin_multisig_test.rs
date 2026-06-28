@@ -1,7 +1,10 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String, Vec};
+use soroban_sdk::{
+    testutils::{storage::Instance, Address as _},
+    Address, Env, String, Vec,
+};
 
 #[test]
 fn test_admin_multisig_flow() {
@@ -43,6 +46,28 @@ fn test_admin_multisig_flow() {
     let stored_proposal = client.get_proposal(&proposal_id);
     assert_eq!(stored_proposal.status, AdminProposalStatus::Executed);
 }
+
+#[test]
+fn test_admin_multisig_instance_ttl_is_extended() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let client = AdminMultisigContractClient::new(&env, &contract_id);
+
+    let admin1 = Address::generate(&env);
+    let admin2 = Address::generate(&env);
+    let signers = Vec::from_array(&env, [admin1, admin2]);
+
+    env.mock_all_auths();
+    client.init_admin_multisig(&2, &signers, &10);
+
+    let ttl = env.as_contract(&contract_id, || env.storage().instance().get_ttl());
+    let expected_ttl = env.as_contract(&contract_id, || {
+        crate::persistent::DEFAULT_TTL.min(env.storage().max_ttl())
+    });
+
+    assert_eq!(ttl, expected_ttl);
+}
+
 #[test]
 fn test_remove_issuer_action_executes_after_threshold() {
     let env = Env::default();

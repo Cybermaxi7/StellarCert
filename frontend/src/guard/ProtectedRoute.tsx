@@ -15,6 +15,19 @@ interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
 }
 
+/**
+ * Returns true when `pathname` equals one of the allowed base paths or is a
+ * sub-route of one. A path matches when it equals an allowed path exactly, or
+ * begins with that path followed by a `/` segment boundary.
+ *
+ * The `/` boundary prevents false positives: `/certificates/abc-123` matches
+ * `/certificates`, but `/certificatesfoo` does not.
+ */
+const isPathAllowed = (pathname: string, allowedPaths: string[]): boolean =>
+  allowedPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -35,7 +48,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
     }
   } else {
     const allowedPaths: string[] = roleRoutes[userRole] ?? [];
-    if (!allowedPaths.includes(location.pathname)) {
+    if (!isPathAllowed(location.pathname, allowedPaths)) {
       return <Navigate to="/" replace />;
     }
   }

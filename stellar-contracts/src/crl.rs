@@ -82,18 +82,18 @@ impl CRLContract {
 
     pub fn revoke_certificate(
         env: Env,
+        authorizer: Address,
         certificate_id: String,
         reason: RevocationReason,
         _serial_number: Option<String>,
     ) {
         let issuer = Self::get_issuer(&env);
         // Allow either the configured issuer or an admin to authorize revocations
-        let invoker = env.invoker();
         let mut authorized = false;
-        if invoker == issuer {
+        if authorizer == issuer {
             authorized = true;
         } else if let Some(admin) = Self::get_admin(&env) {
-            if invoker == admin {
+            if authorizer == admin {
                 authorized = true;
             }
         }
@@ -102,8 +102,7 @@ impl CRLContract {
             panic!("Only issuer or admin can revoke");
         }
 
-        // Require auth from the invoker
-        invoker.require_auth();
+        authorizer.require_auth();
 
         // Verify the certificate exists in the CertificateContract (#414)
         let cert_contract: Address = env
@@ -131,7 +130,7 @@ impl CRLContract {
             reason: reason as u32,
             issuer: issuer.clone(),
             revocation_date: env.ledger().timestamp(),
-            revoked_by: invoker.clone(),
+            revoked_by: authorizer.clone(),
         };
 
         env.storage()

@@ -622,10 +622,12 @@ export const certificateApi = {
     sortOrder?: "asc" | "desc";
     startDate?: string;
     endDate?: string;
+    signal?: AbortSignal;
   }): Promise<PaginatedResponse<Certificate>> => {
+    const { signal, ...restParams } = params || {};
     const searchParams = new URLSearchParams();
     if (params) {
-      Object.entries(params).forEach(([key, value]) => {
+      Object.entries(restParams).forEach(([key, value]) => {
         if (value !== undefined && value !== "") {
           searchParams.append(key, String(value));
         }
@@ -633,6 +635,7 @@ export const certificateApi = {
     }
     return apiClient<PaginatedResponse<Certificate>>(
       `/certificates?${searchParams.toString()}`,
+      { signal },
     );
   },
   create: createCertificate,

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useCall
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../api/types';
-import { tokenStorage, setTokenRefreshCallback } from '../api/tokens';
+import { tokenStorage, subscribeTokenRefresh } from '../api/tokens';
 import { authApi } from '../api/endpoints';
 import { queryKeys } from '../api/queries';
 
@@ -155,7 +155,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     bootstrap();
 
     // Keep AuthContext in sync when apiClient silently refreshes the access token.
-    setTokenRefreshCallback((newAccessToken, refreshedUser) => {
+    const unsubscribe = subscribeTokenRefresh((newAccessToken, refreshedUser) => {
       if (isTokenExpired(newAccessToken)) {
         return;
       }
@@ -178,7 +178,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return () => {
       clearInterval(interval);
-      setTokenRefreshCallback(() => {});
+      unsubscribe();
     };
     // `clearAuth` is stable; `setUser` changes only with the QueryClient.
   }, [clearAuth, setUser]);

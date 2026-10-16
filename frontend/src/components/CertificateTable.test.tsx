@@ -392,3 +392,32 @@ describe('CertificateTable failure feedback', () => {
     expect(screen.queryByText(/no history found/i)).not.toBeInTheDocument();
   });
 });
+
+describe('CertificateTable pagination on empty results (#999)', () => {
+  it('renders "0 results", disables prev and next buttons, and provides accessible labels', async () => {
+    vi.mocked(certificateApi.list).mockResolvedValue({
+      data: [],
+      total: 0,
+      totalPages: 0,
+      page: 1,
+      limit: 10,
+    } as never);
+
+    renderWithProviders(<CertificateTable />, {
+      queryClient: createTestQueryClient(),
+    });
+
+    await waitFor(() => expect(certificateApi.list).toHaveBeenCalled());
+
+    expect(screen.getByText('0 results')).toBeInTheDocument();
+    expect(screen.getByText('No certificates found')).toBeInTheDocument();
+
+    const prevButton = screen.getByRole('button', { name: /previous page/i });
+    const nextButton = screen.getByRole('button', { name: /next page/i });
+
+    expect(prevButton).toBeInTheDocument();
+    expect(nextButton).toBeInTheDocument();
+    expect(prevButton).toBeDisabled();
+    expect(nextButton).toBeDisabled();
+  });
+});

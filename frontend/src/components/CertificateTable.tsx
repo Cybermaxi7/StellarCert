@@ -753,7 +753,7 @@ const CertificateTable = ({ onError, onSuccess }: CertificateTableProps) => {
                 <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-slate-700">
                     <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500 dark:text-slate-400">
-                            Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total} results
+                            {total === 0 ? '0 results' : `Showing ${(page - 1) * limit + 1} to ${Math.min(page * limit, total)} of ${total} results`}
                         </span>
                         <select
                             value={limit}
@@ -769,7 +769,8 @@ const CertificateTable = ({ onError, onSuccess }: CertificateTableProps) => {
                     <div className="flex gap-2">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1}
+                            disabled={page <= 1}
+                            aria-label="Previous page"
                             className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-600 dark:hover:bg-slate-700"
                         >
                             <ChevronLeft className="w-5 h-5" />
@@ -778,8 +779,9 @@ const CertificateTable = ({ onError, onSuccess }: CertificateTableProps) => {
                             Page {page} of {totalPages}
                         </span>
                         <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
+                            onClick={() => setPage(p => Math.max(1, Math.min(Math.max(1, totalPages), p + 1)))}
+                            disabled={page >= totalPages}
+                            aria-label="Next page"
                             className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-600 dark:hover:bg-slate-700"
                         >
                             <ChevronRight className="w-5 h-5" />

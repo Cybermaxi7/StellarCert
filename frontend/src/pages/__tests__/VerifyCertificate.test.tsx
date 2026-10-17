@@ -1,7 +1,10 @@
 import React from "react";
 import { screen, waitFor, fireEvent } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createTestQueryClient, renderWithProviders } from "../../test/renderWithProviders";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "../../test/renderWithProviders";
 
 // ── API mock ───────────────────────────────────────────────────────────────
 // Mocked at the endpoints module: verification now runs through the query layer,
@@ -14,9 +17,39 @@ vi.mock("../../api/endpoints", () => ({
   },
 }));
 
-// ── html5-qrcode mock (camera scanner is irrelevant to these tests) ────────
-vi.mock("html5-qrcode", () => ({
-  Html5QrcodeScanner: vi.fn(),
+// ── QRScannerModal mock (camera scanner is irrelevant to these tests) ─────
+vi.mock("../../components/QRScannerModal", () => ({
+  default: vi.fn(
+    ({
+      isOpen,
+      onClose,
+      onScanSuccess,
+    }: {
+      isOpen: boolean;
+      onClose: () => void;
+      onScanSuccess?: (result: {
+        url: string;
+        certificateId: string | null;
+        raw: string;
+      }) => void;
+    }) =>
+      isOpen ? (
+        <div data-testid="qr-scanner-modal">
+          <button onClick={onClose}>Close Scanner</button>
+          <button
+            onClick={() =>
+              onScanSuccess?.({
+                url: "https://stellarcert.org/verify/MOCK-SCANNED-ID",
+                certificateId: "MOCK-SCANNED-ID",
+                raw: "MOCK-SCANNED-ID",
+              })
+            }
+          >
+            Simulate Scan
+          </button>
+        </div>
+      ) : null,
+  ),
 }));
 
 import VerifyCertificate from "../VerifyCertificate";
@@ -89,15 +122,13 @@ describe("VerifyCertificate share actions (toast, not alert)", () => {
 
     // The existing toast — previously unreachable dead code — is now shown
     await waitFor(() =>
-      expect(
-        screen.getByRole("status").textContent,
-      ).toContain("Link copied to clipboard!"),
+      expect(screen.getByRole("status").textContent).toContain(
+        "Link copied to clipboard!",
+      ),
     );
 
     expect(writeText).toHaveBeenCalledTimes(1);
-    expect(writeText.mock.calls[0][0]).toContain(
-      "/verify?serial=CERT-123",
-    );
+    expect(writeText.mock.calls[0][0]).toContain("/verify?serial=CERT-123");
     // The blocking window.alert fallback must be gone
     expect(alertSpy).not.toHaveBeenCalled();
   });
@@ -109,9 +140,9 @@ describe("VerifyCertificate share actions (toast, not alert)", () => {
     fireEvent.click(copyButton);
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("status").textContent,
-      ).toContain("Copy failed. Please copy the link manually."),
+      expect(screen.getByRole("status").textContent).toContain(
+        "Copy failed. Please copy the link manually.",
+      ),
     );
 
     expect(alertSpy).not.toHaveBeenCalled();
@@ -126,9 +157,9 @@ describe("VerifyCertificate share actions (toast, not alert)", () => {
     fireEvent.click(copyButton);
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("status").textContent,
-      ).toContain("Link copied to clipboard!"),
+      expect(screen.getByRole("status").textContent).toContain(
+        "Link copied to clipboard!",
+      ),
     );
 
     expect(alertSpy).not.toHaveBeenCalled();
@@ -145,9 +176,9 @@ describe("VerifyCertificate share actions (toast, not alert)", () => {
     fireEvent.click(shareButton);
 
     await waitFor(() =>
-      expect(
-        screen.getByRole("status").textContent,
-      ).toContain("Link copied to clipboard!"),
+      expect(screen.getByRole("status").textContent).toContain(
+        "Link copied to clipboard!",
+      ),
     );
 
     expect(writeText).toHaveBeenCalledTimes(1);
@@ -155,5 +186,28 @@ describe("VerifyCertificate share actions (toast, not alert)", () => {
     expect(copied).toContain("Certificate Verified: Jordan Lewis");
     expect(copied).toContain("/verify?serial=CERT-123");
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("VerifyCertificate QR scanner integration", () => {
+  it("opens QRScannerModal when Scan QR is clicked and updates serial on scan", async () => {
+    renderWithProviders(<VerifyCertificate />, {
+      queryClient: createTestQueryClient(),
+      routerEntries: ["/verify"],
+    });
+
+    const scanQrButton = screen.getByRole("button", { name: /Scan QR/i });
+    fireEvent.click(scanQrButton);
+
+    expect(screen.getByTestId("qr-scanner-modal")).toBeInTheDocument();
+
+    const simulateScanButton = screen.getByText("Simulate Scan");
+    fireEvent.click(simulateScanButton);
+
+    expect(screen.queryByTestId("qr-scanner-modal")).not.toBeInTheDocument();
+    const serialInput = screen.getByLabelText(
+      /Certificate Serial Number/i,
+    ) as HTMLInputElement;
+    expect(serialInput.value).toBe("MOCK-SCANNED-ID");
   });
 });

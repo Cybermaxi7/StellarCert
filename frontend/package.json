@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "generate:api": "node scripts/generate-api-types.mjs",
+    "build": "npm run generate:api && tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
-    "typecheck": "tsc -b",
+    "typecheck": "npm run generate:api && tsc -b",
     "check:import-case": "node scripts/check-import-case.mjs",
     "preview": "vite preview"
   },
@@ -50,4 +51,3 @@
     "vitest": "^4.1.11"
   }
 }
-

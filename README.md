@@ -223,6 +223,14 @@ npm run build
 # Start in production
 
 npm start
+
+The frontend typecheck and build refresh shared client types from
+`http://localhost:3000/api/docs-json` when the backend is running. Set
+`OPENAPI_URL` to another reachable Swagger JSON endpoint to refresh from a
+different environment. If the default local endpoint is unavailable, the
+scripts warn and retain the checked-in bootstrap schema; explicitly setting
+`OPENAPI_URL` makes a failed refresh an error. Run `npm run generate:api` in
+`frontend` to refresh the shared types and operation definitions directly.
 🧪 Testing
 Backend Tests
 bash

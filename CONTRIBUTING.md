@@ -28,8 +28,29 @@ project, same credentials, same ports), so you can switch between
 | `npm run dev:deps:down` | Stop them (data is kept in the named volumes) |
 
 Requires Docker Compose v2 (`docker-compose` as shipped with Docker Desktop).
+
 To wipe the data and start from an empty database, run
 `docker-compose -f docker-compose.dev.yml down -v`.
+
+Storage is optional in `backend/.env.example`: `STORAGE_REQUIRED=false`, with
+the S3/MinIO connection settings commented out. The dev compose stack does not
+start MinIO or create a storage bucket. File upload/download operations need a
+separately configured S3-compatible service; the rest of the app can start
+without it and logs a missing-storage warning.
+
+If you copied an older example to `backend/.env`, set `STORAGE_REQUIRED=false`
+and remove or comment out the old `STORAGE_ENDPOINT`, `STORAGE_REGION`,
+`STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` and `STORAGE_BUCKET` entries unless
+you intentionally configured that service. Changing the required flag alone
+does not disable an already configured S3 client. Do not assume that a service
+listening on `localhost:9000` is MinIO.
+
+To enable storage, provision S3/MinIO, create the bucket, and set the commented
+`STORAGE_*` values in `backend/.env.example` to match your service in
+`backend/.env`. Set `STORAGE_REQUIRED=true` if missing storage configuration
+should prevent startup. The "S3 storage client initialized successfully" message
+only confirms client construction, not endpoint connectivity or bucket access;
+verify an upload/download against your intended bucket separately.
 
 2. Build and run the backend (recommended in a separate terminal). Provide required env vars — at minimum the backend requires `JWT_SECRET` and DB connection info. Example `.env` values:
 

@@ -9,7 +9,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, Brackets } from 'typeorm';
 import * as QRCode from 'qrcode';
 import { CreateCertificateDto } from './dto/create-certificate.dto';
 import { UpdateCertificateDto } from './dto/update-certificate.dto';
@@ -889,10 +889,26 @@ export class CertificateService {
       .createQueryBuilder('certificate')
       .leftJoinAndSelect('certificate.issuer', 'issuer');
 
-    if ((dto as any).search) {
+    const search = (dto as any).search;
+    if (search) {
+      // Escape LIKE wildcards so user input is matched literally, and use
+      // ILIKE for case-insensitive matching (previously case-sensitive LIKE).
+      const escaped = String(search).replace(/[\\%_]/g, '\\$&');
       queryBuilder.andWhere(
-        '(certificate.title ILIKE :search OR certificate.recipientName ILIKE :search OR certificate.recipientEmail ILIKE :search)',
-        { search: `%${(dto as any).search}%` },
+        new Brackets((qb) => {
+          qb.where('certificate.title ILIKE :search', {
+            search: `%${escaped}%`,
+          })
+            .orWhere('certificate.recipientName ILIKE :search', {
+              search: `%${escaped}%`,
+            })
+            .orWhere('certificate.recipientEmail ILIKE :search', {
+              search: `%${escaped}%`,
+            })
+            .orWhere('certificate.serialNumber ILIKE :search', {
+              search: `%${escaped}%`,
+            });
+        }),
       );
     }
 
@@ -908,11 +924,26 @@ export class CertificateService {
       });
     }
 
-    if ((dto as any).page && (dto as any).limit) {
-      queryBuilder
-        .skip(((dto as any).page - 1) * (dto as any).limit)
-        .take((dto as any).limit);
+    if ((dto as any).startDate) {
+      queryBuilder.andWhere('certificate.issuedAt >= :startDate', {
+        startDate: new Date((dto as any).startDate),
+      });
     }
+
+    if ((dto as any).endDate) {
+      queryBuilder.andWhere('certificate.issuedAt <= :endDate', {
+        endDate: new Date((dto as any).endDate),
+      });
+    }
+
+    // Always bound the result set: default page/limit keep the query from
+    // degenerating into an unbounded getMany() as the table grows.
+    const page = Math.max(1, Number((dto as any).page) || 1);
+    const limit = Math.min(
+      Math.max(1, Number((dto as any).limit) || 10),
+      MAX_PAGE_LIMIT,
+    );
+    queryBuilder.skip((page - 1) * limit).take(limit);
 
     return queryBuilder.orderBy('certificate.issuedAt', 'DESC').getMany();
   }

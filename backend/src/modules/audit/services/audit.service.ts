@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Repository,
@@ -133,7 +133,7 @@ export class AuditService {
 
   async search(
     searchDto: AuditSearchDto,
-  ): Promise<{ data: AuditLog[]; total: number }> {
+  ): Promise<{ data: AuditLog[]; total: number; nextCursor?: string }> {
     const query = this.auditLogRepository.createQueryBuilder('audit');
 
     if (searchDto.action) {
@@ -192,16 +192,43 @@ export class AuditService {
       });
     }
 
-    query.orderBy('audit.timestamp', 'DESC');
+    query.orderBy('audit.timestamp', 'DESC').addOrderBy('audit.id', 'DESC');
+
+    if (searchDto.cursor) {
+      const separator = searchDto.cursor.indexOf(':');
+      const timestamp = Number(searchDto.cursor.slice(0, separator));
+      const id = searchDto.cursor.slice(separator + 1);
+      if (
+        separator < 1 ||
+        !Number.isSafeInteger(timestamp) ||
+        timestamp < 0 ||
+        !id
+      ) {
+        throw new BadRequestException('Invalid audit log cursor');
+      }
+      query.andWhere(
+        '(audit.timestamp < :cursorTimestamp OR (audit.timestamp = :cursorTimestamp AND audit.id < :cursorId))',
+        { cursorTimestamp: timestamp, cursorId: id },
+      );
+    }
 
     const skip = searchDto.skip || 0;
     const take = Math.min(searchDto.take || 50, 500); // Max 500 records per request
 
-    query.skip(skip).take(take);
+    query.skip(searchDto.cursor ? 0 : skip).take(take + 1);
 
     const [data, total] = await query.getManyAndCount();
+    const hasMore = data.length > take;
+    const pageData = data.slice(0, take);
+    const lastRecord = pageData[pageData.length - 1];
 
-    return { data, total };
+    return {
+      data: pageData,
+      total,
+      ...(hasMore && lastRecord
+        ? { nextCursor: `${lastRecord.timestamp}:${lastRecord.id}` }
+        : {}),
+    };
   }
 
   async getStatistics(

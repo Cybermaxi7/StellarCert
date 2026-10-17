@@ -85,7 +85,7 @@ export default function AdminAnalyticsDashboard() {
   // this dashboard (or returning to a range already seen) is instant.
   const analyticsQuery = useAdminAnalyticsQuery(appliedDateRange);
   const auditStatsQuery = useAuditStatisticsQuery(appliedDateRange);
-  const recentAuditQuery = useAuditSearchQuery({ ...appliedDateRange, limit: 20 });
+  const recentAuditQuery = useAuditSearchQuery({ ...appliedDateRange, take: 20 });
 
   const analytics: AdminAnalytics | null = analyticsQuery.data ?? null;
   const auditStats: AuditStatistics | null = auditStatsQuery.data ?? null;
@@ -321,4 +321,3 @@ export default function AdminAnalyticsDashboard() {
     </div>
   );
 }
-

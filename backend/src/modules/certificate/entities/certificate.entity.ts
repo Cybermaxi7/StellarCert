@@ -8,6 +8,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
+import { createHash } from 'crypto';
 
 import { User } from '../../users/entities/user.entity';
 import { CertificateStatus } from '../constants/certificate-status.enum';
@@ -61,6 +62,16 @@ export class Certificate {
   @Column()
   @Index()
   recipientName: string;
+
+  // Set when the recipient's PII has been anonymised during account erasure.
+  // The original recipientEmail is replaced with a hash so certificate
+  // integrity (and lookup by hashed email) can still be verified.
+  @Column({ nullable: true })
+  @Index()
+  recipientEmailHash?: string;
+
+  @Column({ default: false })
+  isAnonymized: boolean;
 
   @Column({ nullable: true })
   recipientStellarAddress?: string;
@@ -125,6 +136,11 @@ export class Certificate {
 
   @Column({ type: 'jsonb', nullable: true })
   verificationHistory?: VerificationHistoryRecord[];
+
+  // Verification records whose IP addresses have been purged after the
+  // retention period. The record itself is kept for audit integrity.
+  @Column({ type: 'jsonb', nullable: true })
+  purgedVerificationHistory?: VerificationHistoryRecord[];
 
   @Column({ default: 0 })
   verificationCount: number;
@@ -196,5 +212,45 @@ export class Certificate {
       userAgent,
     });
     this.verificationCount = (this.verificationCount ?? 0) + 1;
+  }
+
+  /**
+   * Anonymise recipient PII while keeping the certificate record intact.
+   * The original email is replaced with a hash so the chain of custody
+   * (and any hashed-email lookups) remains verifiable.
+   */
+  anonymizeRecipient(hashedEmail: string): void {
+    this.recipientEmailHash = hashedEmail;
+    this.recipientEmail = hashedEmail;
+    this.recipientName = 'Anonymized';
+    this.recipientId = undefined;
+    this.recipientStellarAddress = undefined;
+    this.isAnonymized = true;
+  }
+
+  /**
+   * Compute the deterministic hash used to anonymise a recipient email.
+   */
+  static hashEmail(email: string): string {
+    return createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+  }
+
+  /**
+   * Purge IP addresses from verification history after the retention period,
+   * preserving the rest of each record for audit integrity.
+   */
+  purgeVerificationIps(): void {
+    if (!this.verificationHistory || this.verificationHistory.length === 0) {
+      return;
+    }
+    const purged = this.verificationHistory.map((record) => ({
+      ...record,
+      ipAddress: '',
+    }));
+    this.purgedVerificationHistory = [
+      ...(this.purgedVerificationHistory ?? []),
+      ...purged,
+    ];
+    this.verificationHistory = [];
   }
 }

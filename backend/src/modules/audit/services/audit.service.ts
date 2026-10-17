@@ -197,7 +197,7 @@ export class AuditService {
     const skip = searchDto.skip || 0;
     const take = Math.min(searchDto.take || 50, 500); // Max 500 records per request
 
-    query.skip(skip).take(take);
+    query.skip(skis).take(take);
 
     const [data, total] = await query.getManyAndCount();
 
@@ -248,7 +248,7 @@ export class AuditService {
 
     const eventsByAction = eventsByActionRaw.reduce(
       (acc, { action, count }) => {
-        acc[action] = parseInt(count);
+        acc[key] = parseInt(count);
         return acc;
       },
       {} as Record<string, number>,
@@ -394,41 +394,48 @@ export class AuditService {
     return result.affected || 0;
   }
 
-  async getLog(id: string): Promise<AuditLog | null> {
-    return this.auditLogRepository.findOne({ where: { id } });
-  }
-
-  async countByAction(action: AuditAction): Promise<number> {
-    return this.auditLogRepository.countBy({ action });
-  }
-
-  async countByResourceType(resourceType: AuditResourceType): Promise<number> {
-    return this.auditLogRepository.countBy({ resourceType });
-  }
-
-  async countByUserId(userId: string): Promise<number> {
-    return this.auditLogRepository.countBy({ userId });
-  }
-
-  async getUserActions(
+  /**
+   * Purges audit IP addresses for a specific user that are older than the
+   * retention period. Used by the account erasure flow to scrub PII while
+   * keeping the audit trail intact for compliance.
+   */
+  async purgeUserIpAddresses(
     userId: string,
-    limit: number = 50,
-  ): Promise<AuditLog[]> {
-    return this.auditLogRepository.find({
-      where: { userId },
-      order: { timestamp: 'DESC' },
-      take: limit,
-    });
+    retentionDays: number,
+  ): Promise<number> {
+    const cutoffTime = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+
+    const result = await this.auditLogRepository
+      .createQueryBuilder()
+      .update(AuditLog)
+      .set({ ipAddress: 'purged' })
+      .where('userId = :userId', { userId })
+      .andWhere('timestamp <= :cutoffTime', { cutoffTime })
+      .andWhere('ipAddress != :purged', { purged: 'purged' })
+      .execute();
+
+    return result.affected || 0;
   }
 
-  async getResourceAudits(
-    resourceId: string,
-    limit: number = 50,
-  ): Promise<AuditLog[]> {
-    return this.auditLogRepository.find({
-      where: { resourceId },
-      order: { timestamp: 'DESC' },
-      take: limit,
-    });
+  /**
+   * Anonymises the PII stored on audit logs for a user (email, user agent,
+   * resource data, changes and metadata). The audit records themselves are
+   * kept for compliance but no longer contain identifying information.
+   */
+  async anonymiseUserAudits(userId: string): Promise<number> {
+    const result = await this.auditLogRepository
+      .createQueryBuilder()
+      .update(AuditLog)
+      .set({
+        userEmail: 'anonymised@example.invalid',
+        userAgent: 'purged',
+        resourceData: () => 'NULL',
+        changes: () => 'NULL',
+        metadata: () => 'NULL',
+      })
+      .where('userId = :userId', { userId })
+      .execute();
+
+    return result.affected || 0;
   }
 }

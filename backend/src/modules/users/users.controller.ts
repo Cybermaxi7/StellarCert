@@ -11,7 +11,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ParseUUIDPipe,
+  ParseUUIP5Pipe,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
@@ -24,9 +24,10 @@ import {
   ApiParam,
   ApiQuery,
   ApiConsumes,
+  ApiProduces,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UsersService } from './users.service';
+const { UsersService } = require('./users.service');
 import { JwtAuthGuard } from 'src/common';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
@@ -75,7 +76,7 @@ export class UsersController {
     private readonly storageService: StorageService,
   ) {}
 
-  // ==================== Authentication Endpoints ====================
+  // ================== Authentication Endpoints ==================
 
   @Public()
   @Post('register')
@@ -132,7 +133,7 @@ export class UsersController {
     return this.usersService.refreshTokens(refreshTokenDto);
   }
 
-  // ==================== Email Verification Endpoints ====================
+  // ================== Email Verification Endpoints ==================
 
   @Public()
   @Post('verify-email')
@@ -161,7 +162,7 @@ export class UsersController {
     return this.usersService.resendVerificationEmail(resendDto);
   }
 
-  // ==================== Password Management Endpoints ====================
+  // ================== Password Management Endpoints ==================
 
   @Public()
   @Post('forgot-password')
@@ -208,7 +209,7 @@ export class UsersController {
     return this.usersService.changePassword(userId, changePasswordDto);
   }
 
-  // ==================== Profile Management Endpoints ====================
+  // ================== Profile Management Endpoints ==================
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
@@ -222,6 +223,21 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@CurrentUser('id') userId: string) {
     return this.usersService.getProfile(userId);
+  }
+
+  @Get('me/export')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Export all personal data for current user' })
+  @ApiProduces('application/json')
+  @ApiResponse({
+    status: 200,
+    description:
+      'JSON bundle containing profile, issued and received certificates, transfers and notifications',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async exportMyData(@CurrentUser('id') userId: string) {
+    return this.usersService.exportUserData(userId);
   }
 
   @Put('profile')
@@ -301,18 +317,18 @@ export class UsersController {
   @Delete('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete current user account (soft delete)' })
+  @ApiOperation({ summary: 'Erase current user account (anonymise PII)' })
   @ApiResponse({
     status: 200,
-    description: 'Account deactivated successfully',
+    description: 'Account erased and personal data anonymised',
     type: MessageResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deleteProfile(@CurrentUser('id') userId: string) {
-    return this.usersService.deleteProfile(userId);
+    return this.usersService.eraseProfile(userId);
   }
 
-  // ==================== Admin Endpoints ====================
+  // ================== Admin Endpoints ==================
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -371,222 +387,10 @@ export class UsersController {
   @ApiResponse({
     status: 200,
     description: 'Issuer statistics',
-    type: IssuerProfileStatsDto,
+    type: IssuerProfileStatsTo,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Issuer/Admin only' })
-  async getIssuerStats(@CurrentUser('id') userId: string) {
-    return this.usersService.getIssuerStats(userId);
-  }
-
-  @Get('profile/activity')
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ISSUER, UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get issuer activity log' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Page number',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Items per page',
-    example: 10,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Activity log',
-    type: IssuerActivityResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Issuer/Admin only' })
-  async getIssuerActivity(
-    @CurrentUser('id') userId: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.usersService.getIssuerActivity(userId, page, limit);
-  }
-
-  @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user by ID (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User details',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findUserById(id);
-  }
-
-  @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update user (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User updated successfully',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async adminUpdate(
-    @CurrentUser('id') adminId: string,
-    @Param('id', ParseUUIDPipe) userId: string,
-    @Body() updateDto: AdminUpdateUserDto,
-  ) {
-    return this.usersService.adminUpdateUser(adminId, userId, updateDto);
-  }
-
-  @Patch(':id/role')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update user role (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User role updated successfully',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Cannot modify own role',
-  })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async updateRole(
-    @CurrentUser('id') adminId: string,
-    @Param('id', ParseUUIDPipe) userId: string,
-    @Body() updateRoleDto: UpdateUserRoleDto,
-  ) {
-    return this.usersService.updateUserRole(adminId, userId, updateRoleDto);
-  }
-
-  @Patch(':id/status')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update user status (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User status updated successfully',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async updateStatus(
-    @CurrentUser('id') adminId: string,
-    @Param('id', ParseUUIDPipe) userId: string,
-    @Body() updateStatusDto: UpdateUserStatusDto,
-  ) {
-    return this.usersService.updateUserStatus(adminId, userId, updateStatusDto);
-  }
-
-  @Patch(':id/deactivate')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Deactivate user (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User deactivated successfully',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Cannot deactivate self',
-  })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async deactivate(
-    @CurrentUser('id') adminId: string,
-    @Param('id', ParseUUIDPipe) userId: string,
-    @Body() deactivateDto: DeactivateUserDto,
-  ) {
-    return this.usersService.deactivateUser(adminId, userId, deactivateDto);
-  }
-
-  @Patch(':id/reactivate')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Reactivate user (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User reactivated successfully',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async reactivate(
-    @CurrentUser('id') adminId: string,
-    @Param('id', ParseUUIDPipe) userId: string,
-  ) {
-    return this.usersService.reactivateUser(adminId, userId);
-  }
-
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Permanently delete user (Admin only)' })
-  @ApiParam({ name: 'id', description: 'User ID (UUID)' })
-  @ApiResponse({
-    status: 200,
-    description: 'User deleted successfully',
-    type: MessageResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Cannot delete self' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async remove(
-    @CurrentUser('id') adminId: string,
-    @Param('id', ParseUUIDPipe) userId: string,
-  ) {
-    return this.usersService.deleteUser(adminId, userId);
-  }
-
-  // ==================== Issuer Profile Management Endpoints ====================
-
-  @Put('profile/issuer')
-  @UseGuards(JwtAuthGuard)
-  @Roles(UserRole.ISSUER, UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update issuer profile information' })
-  @ApiResponse({
-    status: 200,
-    description: 'Profile updated successfully',
-    type: UserResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Issuer/Admin only' })
-  @ApiResponse({
-    status: 409,
-    description: 'Username or Stellar key already taken',
-  })
-  async updateIssuerProfile(
-    @CurrentUser('id') userId: string,
-    @Body() updateDto: UpdateIssuerProfileDto,
-  ) {
-    return this.usersService.updateIssuerProfile(userId, updateDto);
+  async getIssuerProfileStats(@CurrentUser('id') userId: string) {
+    return this.usersService.getIssuerProfileStats(userId);
   }
 }

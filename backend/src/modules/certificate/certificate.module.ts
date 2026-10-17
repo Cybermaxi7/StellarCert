@@ -6,12 +6,14 @@ import { ConfigModule } from '@nestjs/config';
 import { Certificate } from './entities/certificate.entity';
 import { Verification } from './entities/verification.entity';
 import { CertificateTransfer } from './entities/certificate-transfer.entity';
+import { CertificateTemplate } from './entities/certificate-template.entity';
 import { User } from '../users/entities/user.entity';
 
 import { CertificateService } from './certificate.service';
 import { CertificateStatsService } from './services/stats.service';
 import { DuplicateDetectionService } from './services/duplicate-detection.service';
 import { CertificatePdfService } from './services/pdf.service';
+import { CertificateTemplateService } from './services/template.service';
 import { CertificateTransferService } from './services/certificate-transfer.service';
 
 import { CertificateController } from './certificate.controller';
@@ -36,6 +38,7 @@ import { EmailModule } from '../email/email.module';
       Verification,
       User,
       CertificateTransfer,
+      CertificateTemplate,
     ]),
     CacheModule.register({
       ttl: 300,
@@ -62,6 +65,7 @@ import { EmailModule } from '../email/email.module';
     CertificateStatsService,
     DuplicateDetectionService,
     CertificatePdfService,
+    CertificateTemplateService,
     CertificateTransferService,
     CertificateMapper,
   ],

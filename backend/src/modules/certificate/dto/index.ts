@@ -15,3 +15,4 @@ export {
 export * from './create-certificate.dto';
 export * from './update-certificate.dto';
 export * from './export-filters.dto';
+export * from './certificate-template.dto';

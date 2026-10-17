@@ -96,6 +96,8 @@ enum DataKey {
     Revocation(String),
     RevokedCertificates,
     CertContract,
+    RevokedCertificate(u32),
+    MerkleFrontier,
 }
 
 #[contract]
@@ -129,22 +131,21 @@ impl CRLContract {
         issuer.require_auth();
 
         let now = env.ledger().timestamp();
-        let empty_ids: Vec<String> = Vec::new(&env);
         let crl_info = CRLInfo {
             issuer: issuer.clone(),
             revoked_count: 0,
             crl_number: 1,
             this_update: now,
             next_update: now + DEFAULT_UPDATE_WINDOW_SECONDS,
-            merkle_root: Self::build_merkle_root(&env, &empty_ids),
+            merkle_root: Self::empty_merkle_root(&env),
         };
 
         Self::set_persistent(&env, &DataKey::Issuer, &issuer);
         Self::set_persistent(&env, &DataKey::CertContract, &certificate_contract);
         Self::set_persistent(
             &env,
-            &DataKey::RevokedCertificates,
-            &Vec::<String>::new(&env),
+            &DataKey::MerkleFrontier,
+            &Vec::<Option<BytesN<32>>>::new(&env),
         );
         Self::set_persistent(&env, &DataKey::Info, &crl_info);
     }
@@ -242,12 +243,14 @@ impl CRLContract {
 
         Self::set_persistent(env, &revocation_key, &revocation_info);
 
-        let mut revoked_certificates = Self::get_revoked_certificate_ids(env);
-        revoked_certificates.push_back(certificate_id.clone());
-        Self::set_persistent(env, &DataKey::RevokedCertificates, &revoked_certificates);
-
+        Self::set_persistent(
+            env,
+            &DataKey::RevokedCertificate(crl_info.revoked_count),
+            certificate_id,
+        );
+        crl_info.merkle_root = Self::append_merkle_leaf(env, certificate_id);
         crl_info.revoked_count += 1;
-        Self::refresh_crl_info(env, &mut crl_info, &revoked_certificates);
+        Self::refresh_crl_info(env, &mut crl_info);
         Self::set_persistent(env, &DataKey::Info, &crl_info);
 
         // Announce the revocation only after every storage write succeeded, so
@@ -303,7 +306,6 @@ impl CRLContract {
             panic!("Pagination limit exceeds maximum allowed");
         }
 
-        let revoked_certificates = Self::get_revoked_certificate_ids(&env);
         let mut page_of_revocations = Vec::new(&env);
 
         if limit == 0 {
@@ -312,21 +314,24 @@ impl CRLContract {
 
         let start = page.saturating_sub(1).saturating_mul(limit);
         let mut end = start.saturating_add(limit);
-        let total = revoked_certificates.len();
+        let total = Self::get_crl_info_internal(&env).revoked_count;
         if end > total {
             end = total;
         }
 
         let mut index = start;
         while index < end {
-            if let Some(certificate_id) = revoked_certificates.get(index) {
-                if let Some(revocation_info) = env
-                    .storage()
-                    .persistent()
-                    .get(&DataKey::Revocation(certificate_id.clone()))
-                {
-                    page_of_revocations.push_back(revocation_info);
-                }
+            let certificate_id: String = env
+                .storage()
+                .persistent()
+                .get(&DataKey::RevokedCertificate(index))
+                .expect("Revoked certificate index not found");
+            if let Some(revocation_info) = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Revocation(certificate_id))
+            {
+                page_of_revocations.push_back(revocation_info);
             }
             index += 1;
         }
@@ -374,8 +379,7 @@ impl CRLContract {
             crl_info.next_update = new_next_update;
         }
 
-        let revoked_ids = Self::get_revoked_certificate_ids(&env);
-        Self::refresh_crl_info(&env, &mut crl_info, &revoked_ids);
+        Self::refresh_crl_info(&env, &mut crl_info);
         Self::set_persistent(&env, &DataKey::Info, &crl_info);
     }
 
@@ -408,80 +412,91 @@ impl CRLContract {
         env.storage().instance().get(&DataKey::Admin)
     }
 
-    fn get_revoked_certificate_ids(env: &Env) -> Vec<String> {
-        match env
-            .storage()
-            .persistent()
-            .get(&DataKey::RevokedCertificates)
-        {
-            Some(revoked_certificates) => revoked_certificates,
-            None => Vec::new(env),
-        }
-    }
-
-    fn refresh_crl_info(env: &Env, crl_info: &mut CRLInfo, revoked_ids: &Vec<String>) {
+    fn refresh_crl_info(env: &Env, crl_info: &mut CRLInfo) {
         crl_info.crl_number += 1;
         crl_info.this_update = env.ledger().timestamp();
-        crl_info.merkle_root = Self::build_merkle_root(env, revoked_ids);
     }
 
-    fn build_merkle_root(env: &Env, revoked_ids: &Vec<String>) -> String {
-        fn sha256_bytes(env: &Env, data: &Bytes) -> BytesN<32> {
-            env.crypto().sha256(data).into()
-        }
+    fn empty_merkle_root(env: &Env) -> String {
+        let empty_hash: BytesN<32> = env.crypto().sha256(&Bytes::new(env)).into();
+        Self::hash_to_hex(env, &empty_hash)
+    }
 
-        fn pair_hash(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
-            let mut combined = [0u8; 64];
-            combined[..32].copy_from_slice(&left.to_array());
-            combined[32..].copy_from_slice(&right.to_array());
-            sha256_bytes(env, &Bytes::from_slice(env, &combined))
-        }
+    fn append_merkle_leaf(env: &Env, id: &String) -> String {
+        let len = id.len() as usize;
+        let mut leaf_data = [0u8; 257];
+        leaf_data[0] = 0;
+        id.copy_into_slice(&mut leaf_data[1..len + 1]);
+        let leaf_hash: BytesN<32> = env
+            .crypto()
+            .sha256(&Bytes::from_slice(env, &leaf_data[..len + 1]))
+            .into();
 
-        fn hash_to_hex(env: &Env, hash: &BytesN<32>) -> String {
-            const HEX: &[u8; 16] = b"0123456789abcdef";
-            let arr = hash.to_array();
-            let mut out = [0u8; 64];
-            let mut i = 0usize;
-            while i < 32 {
-                out[i * 2] = HEX[(arr[i] >> 4) as usize];
-                out[i * 2 + 1] = HEX[(arr[i] & 0xf) as usize];
-                i += 1;
+        let mut frontier: Vec<Option<BytesN<32>>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MerkleFrontier)
+            .expect("Merkle frontier not initialized");
+        let mut current = leaf_hash;
+        let mut level = 0u32;
+
+        loop {
+            match frontier.get(level) {
+                Some(Some(left)) => {
+                    current = Self::hash_node(env, &left, &current);
+                    frontier.set(level, None);
+                    level += 1;
+                }
+                Some(None) => {
+                    frontier.set(level, Some(current));
+                    break;
+                }
+                None => {
+                    frontier.push_back(Some(current));
+                    break;
+                }
             }
-            // SAFETY: out contains only ASCII hex chars (0-9, a-f)
-            String::from_str(env, unsafe { core::str::from_utf8_unchecked(&out) })
         }
 
-        if revoked_ids.is_empty() {
-            return hash_to_hex(env, &sha256_bytes(env, &Bytes::new(env)));
-        }
+        Self::set_persistent(env, &DataKey::MerkleFrontier, &frontier);
 
-        // Build leaf hashes from certificate IDs
-        let mut layer: Vec<BytesN<32>> = Vec::new(env);
-        for id in revoked_ids.iter() {
-            let len = id.len() as usize;
-            let mut buf = [0u8; 256];
-            id.copy_into_slice(&mut buf[..len]);
-            let id_bytes = Bytes::from_slice(env, &buf[..len]);
-            layer.push_back(sha256_bytes(env, &id_bytes));
-        }
-
-        // Combine pairs up the tree until one root remains
-        while layer.len() > 1 {
-            let mut next: Vec<BytesN<32>> = Vec::new(env);
-            let mut i = 0u32;
-            while i < layer.len() {
-                let left = layer.get_unchecked(i);
-                let right = if i + 1 < layer.len() {
-                    layer.get_unchecked(i + 1)
-                } else {
-                    left.clone() // duplicate odd leaf
-                };
-                next.push_back(pair_hash(env, &left, &right));
-                i += 2;
+        let mut root: Option<BytesN<32>> = None;
+        let mut index = frontier.len();
+        // Fold larger left-side peaks first; smaller right-side peaks are promoted.
+        while index > 0 {
+            index -= 1;
+            if let Some(Some(peak)) = frontier.get(index) {
+                root = Some(match root {
+                    Some(right) => Self::hash_node(env, &peak, &right),
+                    None => peak,
+                });
             }
-            layer = next;
         }
 
-        hash_to_hex(env, &layer.get_unchecked(0))
+        Self::hash_to_hex(env, &root.expect("Merkle frontier is empty"))
+    }
+
+    fn hash_node(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+        let mut combined = [0u8; 65];
+        combined[0] = 1;
+        combined[1..33].copy_from_slice(&left.to_array());
+        combined[33..].copy_from_slice(&right.to_array());
+        env.crypto()
+            .sha256(&Bytes::from_slice(env, &combined))
+            .into()
+    }
+
+    fn hash_to_hex(env: &Env, hash: &BytesN<32>) -> String {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let arr = hash.to_array();
+        let mut out = [0u8; 64];
+        let mut i = 0usize;
+        while i < 32 {
+            out[i * 2] = HEX[(arr[i] >> 4) as usize];
+            out[i * 2 + 1] = HEX[(arr[i] & 0xf) as usize];
+            i += 1;
+        }
+        // SAFETY: out contains only ASCII hex chars (0-9, a-f)
+        String::from_str(env, unsafe { core::str::from_utf8_unchecked(&out) })
     }
 }

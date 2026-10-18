@@ -1,10 +1,7 @@
 import {
   Injectable,
-  NotFoundException,
   ConflictException,
   BadRequestException,
-  UnauthorizedException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -12,7 +9,6 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { User, UserRole, UserStatus } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
-import { LoginUserDto, RefreshTokenDto } from '../dto/login-user.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
 import {
   VerifyEmailDto,
@@ -26,8 +22,6 @@ import { AuditService } from '../../audit/services/audit.service';
 @Injectable()
 export class UserAuthService {
   private readonly SALT_ROUNDS = 12;
-  private readonly MAX_LOGIN_ATTEMPTS = 5;
-  private readonly LOCK_TIME_MINUTES = 30;
   private readonly EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
 
   constructor(
@@ -38,10 +32,6 @@ export class UserAuthService {
     private readonly logger: LoggingService,
     private readonly auditService: AuditService,
   ) {}
-
-  async findByEmailWithPassword(email: string): Promise<User | null> {
-    return await this.userRepository.findByEmailWithPassword(email);
-  }
 
   async register(
     createUserDto: CreateUserDto,
@@ -98,127 +88,6 @@ export class UserAuthService {
       user: this.toPublicUser(user),
       tokens,
     };
-  }
-
-  async login(
-    loginDto: LoginUserDto,
-  ): Promise<{ user: IUserPublic; tokens: IAuthTokens }> {
-    const { email, password } = loginDto;
-
-    // Find user with password
-    const user = await this.userRepository.findByEmailWithPassword(email);
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    // Check if account is locked
-    if (user.isLocked()) {
-      const remainingTime = Math.ceil(
-        (user.lockedUntil.getTime() - Date.now()) / 60000,
-      );
-      throw new ForbiddenException(
-        `Account is locked. Please try again in ${remainingTime} minutes`,
-      );
-    }
-
-    // Check if account is suspended
-    if (user.status === UserStatus.SUSPENDED) {
-      throw new ForbiddenException('Account is suspended');
-    }
-
-    // Check if account is active
-    if (!user.isActive) {
-      throw new ForbiddenException('Account is deactivated');
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      // Increment login attempts
-      await this.userRepository.incrementLoginAttempts(user.id);
-
-      // Check if should lock account
-      if (user.loginAttempts + 1 >= this.MAX_LOGIN_ATTEMPTS) {
-        const lockUntil = new Date();
-        lockUntil.setMinutes(lockUntil.getMinutes() + this.LOCK_TIME_MINUTES);
-        await this.userRepository.lockAccount(user.id, lockUntil);
-        throw new ForbiddenException(
-          `Too many failed attempts. Account locked for ${this.LOCK_TIME_MINUTES} minutes`,
-        );
-      }
-
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    // Reset login attempts on successful login
-    await this.userRepository.resetLoginAttempts(user.id);
-
-    // Update last login
-    await this.userRepository.updateLastLogin(user.id);
-
-    // Generate tokens
-    const tokens = await this.generateTokens(user);
-
-    this.logger.log(`User logged in: ${user.email}`);
-
-    return {
-      user: this.toPublicUser(user),
-      tokens,
-    };
-  }
-
-  async logout(userId: string): Promise<void> {
-    await this.userRepository.update(userId, {
-      refreshToken: undefined,
-      refreshTokenExpires: undefined,
-    });
-    this.logger.log(`User logged out: ${userId}`);
-  }
-
-  async refreshTokens(refreshTokenDto: RefreshTokenDto): Promise<IAuthTokens> {
-    const { refreshToken } = refreshTokenDto;
-
-    // Verify refresh token signature and extract payload
-    let payload: { sub: string } | null = null;
-    try {
-      const decoded = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      });
-
-      if (!decoded || !decoded.sub || typeof decoded.sub !== 'string') {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-
-      payload = { sub: decoded.sub };
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const userId = payload?.sub;
-    if (!userId) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    // Load user and validate stored refresh token hash
-    const user = await this.userRepository.findById(userId);
-    if (!user || !user.refreshToken) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const matches = await bcrypt.compare(refreshToken, user.refreshToken);
-    if (!matches) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    // Check if refresh token is expired
-    if (user.refreshTokenExpires && user.refreshTokenExpires < new Date()) {
-      throw new UnauthorizedException('Refresh token expired');
-    }
-
-    // Generate new tokens
-    return this.generateTokens(user);
   }
 
   async verifyEmail(

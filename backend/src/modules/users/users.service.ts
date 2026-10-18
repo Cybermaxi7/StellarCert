@@ -19,7 +19,6 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/change-password.dto';
-import { LoginUserDto, RefreshTokenDto } from './dto/login-user.dto';
 import { UserFilterDto } from './dto/pagination.dto';
 import {
   AdminUpdateUserDto,
@@ -61,32 +60,15 @@ export class UsersService {
     private readonly userAdminService: UserAdminService,
   ) {}
 
-  // ==================== Authentication Delegation ====================
-
-  async findByEmailWithPassword(email: string): Promise<User | null> {
-    return await this.userAuthService.findByEmailWithPassword(email);
-  }
+  // Authentication delegation removed (#1195): /users login/logout/refresh
+  // duplicated /auth/* through UserAuthService with different token lifetimes
+  // and no 2FA handling. All authentication flows live in AuthService.
 
   async register(
     createUserDto: CreateUserDto,
   ): Promise<{ user: IUserPublic; tokens: IAuthTokens }> {
     return await this.userAuthService.register(createUserDto);
   }
-
-  async login(
-    loginDto: LoginUserDto,
-  ): Promise<{ user: IUserPublic; tokens: IAuthTokens }> {
-    return await this.userAuthService.login(loginDto);
-  }
-
-  async logout(userId: string): Promise<void> {
-    await this.userAuthService.logout(userId);
-  }
-
-  async refreshTokens(refreshTokenDto: RefreshTokenDto): Promise<IAuthTokens> {
-    return await this.userAuthService.refreshTokens(refreshTokenDto);
-  }
-
   // ==================== Email Verification Delegation ====================
 
   async verifyEmail(

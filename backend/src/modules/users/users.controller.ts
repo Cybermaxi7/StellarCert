@@ -32,8 +32,6 @@ import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User, UserRole } from './entities/user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
-import { LoginUserDto, RefreshTokenDto } from './dto/login-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import {
   ChangePasswordDto,
@@ -53,7 +51,6 @@ import {
 } from './dto/email-verification.dto';
 import {
   UserResponseDto,
-  AuthResponseDto,
   PaginatedUsersResponseDto,
   MessageResponseDto,
 } from './dto/user-response.dto';
@@ -75,64 +72,12 @@ export class UsersController {
     private readonly storageService: StorageService,
   ) {}
 
-  // ==================== Authentication Endpoints ====================
-
-  @Public()
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({
-    status: 201,
-    description: 'User registered successfully',
-    type: AuthResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Validation error' })
-  @ApiResponse({ status: 409, description: 'Email already registered' })
-  async register(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.register(createUserDto);
-  }
-
-  @Public()
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login user' })
-  @ApiResponse({
-    status: 200,
-    description: 'Login successful',
-    type: AuthResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  @ApiResponse({ status: 403, description: 'Account locked or deactivated' })
-  async login(@Body() loginDto: LoginUserDto) {
-    return this.usersService.login(loginDto);
-  }
-
-  @Post('logout')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Logout user' })
-  @ApiResponse({ status: 200, description: 'Logout successful' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async logout(@CurrentUser('id') userId: string) {
-    await this.usersService.logout(userId);
-    return { message: 'Logged out successfully' };
-  }
-
-  @Public()
-  @Post('refresh-token')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token' })
-  @ApiResponse({
-    status: 200,
-    description: 'Tokens refreshed successfully',
-  })
-  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.usersService.refreshTokens(refreshTokenDto);
-  }
-
   // ==================== Email Verification Endpoints ====================
+  // /users/register, /users/login, /users/logout and /users/refresh-token
+  // were removed (issue #1195): they duplicated /auth/* through a second
+  // service (UserAuthService) with different token lifetimes and no 2FA
+  // handling. Authentication now lives exclusively under /auth/*, backed by
+  // AuthService.
 
   @Public()
   @Post('verify-email')

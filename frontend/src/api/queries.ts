@@ -24,6 +24,7 @@ import {
   authApi,
   certificateApi,
   createCertificate,
+  crlApi,
   fetchDefaultTemplate,
   getUserCertificates,
   issuerProfileApi,
@@ -61,6 +62,10 @@ export const queryKeys = {
       ["certificates", "history", certificateId] as const,
   },
   templates: () => ["templates"] as const,
+  crl: {
+    list: (params: unknown) => ["crl", "list", params] as const,
+    merkleRoot: () => ["crl", "merkle-root"] as const,
+  },
   analytics: {
     root: ["analytics"] as const,
     dashboardSummary: (params: unknown) =>

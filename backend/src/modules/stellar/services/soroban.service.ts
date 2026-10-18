@@ -1,7 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  Account,
   Contract,
+  rpc,
   TransactionBuilder,
   Networks,
   Keypair,
@@ -414,6 +416,43 @@ export class SorobanService implements OnModuleInit {
     } catch (error: any) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Get certificate failed: ${message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Read the Merkle root currently published by the CRL contract.
+   *
+   * A read-only simulation, so it needs no funded account and submits nothing.
+   * Returns null when the CRL contract or RPC is not configured, or the call
+   * fails — callers show "unavailable" rather than erroring the whole page.
+   */
+  async getCrlMerkleRoot(): Promise<string | null> {
+    try {
+      if (!this.crlContractId || !this.server) {
+        return null;
+      }
+
+      const contract = new Contract(this.crlContractId);
+      const transaction = new TransactionBuilder(
+        new Account(
+          'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+          '0',
+        ),
+        { fee: '100', networkPassphrase: this.networkPassphrase },
+      )
+        .addOperation(contract.call('get_merkle_root'))
+        .setTimeout(0)
+        .build();
+
+      const response = await this.server.simulateTransaction(transaction);
+      if (rpc.Api.isSimulationSuccess(response) && response.result) {
+        return String(scValToNative(response.result.retval));
+      }
+      return null;
+    } catch (error: any) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Get CRL merkle root failed: ${message}`);
       return null;
     }
   }

@@ -42,6 +42,7 @@ export default function Header(): JSX.Element {
   const navItems: NavItem[] = [
     { label: 'Home', to: '/' },
     { label: 'Verify', to: '/verify' },
+    { label: 'CRL', to: '/crl' },
     ...(user ? ([{ label: 'Dashboard', to: '/dashboard' }] as NavItem[]) : []),
     ...(isIssuerOrAdmin
       ? ([{ label: 'Issue', to: '/issue' }, { label: 'Revoke', to: '/revoke' }] as NavItem[])

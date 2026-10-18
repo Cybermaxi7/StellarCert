@@ -18,6 +18,8 @@ import { CertificateController } from './certificate.controller';
 import { DuplicateDetectionController } from './controllers/duplicate-detection.controller';
 import { TemplatesController } from './controllers/templates.controller';
 import { CertificateTransferController } from './controllers/certificate-transfer.controller';
+import { CrlController } from './controllers/crl.controller';
+import { CrlService } from './services/crl.service';
 import { CertificateMapper } from './mappers/certificate.mapper';
 
 import { MetadataSchemaModule } from '../metadata-schema/metadata-schema.module';
@@ -56,8 +58,10 @@ import { EmailModule } from '../email/email.module';
     DuplicateDetectionController,
     TemplatesController,
     CertificateTransferController,
+    CrlController,
   ],
   providers: [
+    CrlService,
     CertificateService,
     CertificateStatsService,
     DuplicateDetectionService,

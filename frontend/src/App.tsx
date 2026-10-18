@@ -26,6 +26,7 @@ const CertificateManagementPage = lazy(
 const NotificationPreferences = lazy(
   () => import("./pages/NotificationPreferences"),
 );
+const CrlPage = lazy(() => import("./pages/CrlPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 
@@ -63,6 +64,7 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/verify" element={<VerifyCertificate />} />
+                  <Route path="/crl" element={<CrlPage />} />
                   <Route path="/verify-email" element={<VerifyEmail />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
 

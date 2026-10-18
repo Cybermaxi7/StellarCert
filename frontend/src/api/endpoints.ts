@@ -1449,6 +1449,46 @@ export const dashboardApi = {
   },
 };
 
+// ==================== CERTIFICATE REVOCATION LIST ====================
+
+export interface CrlEntry {
+  certificateId: string;
+  issuerId: string;
+  reason: string | null;
+  revokedAt: string;
+}
+
+export interface CrlPage {
+  data: CrlEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CrlMerkleRoot {
+  computed: string;
+  onChain: string | null;
+  inSync: boolean | null;
+  revokedCount: number;
+}
+
+export const crlApi = {
+  list: (params: {
+    page?: number;
+    limit?: number;
+    issuerId?: string;
+  }): Promise<CrlPage> => {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.limit) search.set("limit", String(params.limit));
+    if (params.issuerId) search.set("issuerId", params.issuerId);
+    return apiClient<CrlPage>(`/crl?${search.toString()}`, { skipAuth: true });
+  },
+  getMerkleRoot: (): Promise<CrlMerkleRoot> =>
+    apiClient<CrlMerkleRoot>("/crl/merkle-root", { skipAuth: true }),
+};
+
 // ==================== AUDIT LOGS (#283) ====================
 
 export const auditApi = {

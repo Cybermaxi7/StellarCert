@@ -6,7 +6,9 @@ import { ConfigModule } from '@nestjs/config';
 import { Certificate } from './entities/certificate.entity';
 import { Verification } from './entities/verification.entity';
 import { CertificateTransfer } from './entities/certificate-transfer.entity';
+import { ContractEventCursor } from './entities/contract-event-cursor.entity';
 import { User } from '../users/entities/user.entity';
+import { ContractEventIndexerService } from './services/contract-event-indexer.service';
 
 import { CertificateService } from './certificate.service';
 import { CertificateStatsService } from './services/stats.service';
@@ -36,6 +38,7 @@ import { EmailModule } from '../email/email.module';
       Verification,
       User,
       CertificateTransfer,
+      ContractEventCursor,
     ]),
     CacheModule.register({
       ttl: 300,
@@ -64,6 +67,7 @@ import { EmailModule } from '../email/email.module';
     CertificatePdfService,
     CertificateTransferService,
     CertificateMapper,
+    ContractEventIndexerService,
   ],
   exports: [
     CertificateService,

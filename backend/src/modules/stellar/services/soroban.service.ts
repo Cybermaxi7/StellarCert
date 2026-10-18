@@ -29,6 +29,17 @@ export interface CertificateContractData {
   expiresAt?: number;
 }
 
+export interface RawContractEvent {
+  id: string;
+  pagingToken: string;
+  ledger: number;
+  txHash: string;
+  contractId: string;
+  inSuccessfulContractCall: boolean;
+  topic: xdr.ScVal[];
+  value: xdr.ScVal;
+}
+
 export interface MultisigRequest {
   id: string;
   issuer: string;
@@ -534,6 +545,71 @@ export class SorobanService implements OnModuleInit {
     throw new Error(
       `Transaction ${hash} did not settle after ${maxRetries} polling attempts`,
     );
+  }
+
+  /**
+   * IDs of the contracts whose events the backend mirrors into the database.
+   */
+  getEventContractIds(): string[] {
+    return [this.certificateContractId, this.crlContractId].filter(
+      (id): id is string => !!id,
+    );
+  }
+
+  /** Sequence of the newest ledger the RPC node has closed. */
+  async getLatestLedgerSequence(): Promise<number> {
+    const latest = await this.server.getLatestLedger();
+    return latest.sequence;
+  }
+
+  /**
+   * Fetch one page of contract events via the RPC `getEvents` method.
+   *
+   * Pass `cursor` to resume after a previously returned page; `startLedger` is
+   * only used when there is no cursor (the RPC rejects both together).
+   */
+  async getContractEvents(params: {
+    cursor?: string;
+    startLedger?: number;
+    limit?: number;
+  }): Promise<{
+    events: RawContractEvent[];
+    cursor?: string;
+    latestLedger: number;
+  }> {
+    const contractIds = this.getEventContractIds();
+    const request: Record<string, unknown> = {
+      filters: [{ type: 'contract', contractIds }],
+      limit: params.limit ?? 100,
+    };
+    if (params.cursor) {
+      request.cursor = params.cursor;
+    } else {
+      request.startLedger = params.startLedger;
+    }
+
+    const response = await this.server.getEvents(request);
+    return {
+      events: (response.events ?? []).map(
+        (e: any): RawContractEvent => ({
+          id: e.id,
+          pagingToken: e.pagingToken ?? e.id,
+          ledger: e.ledger,
+          txHash: e.txHash,
+          contractId: e.contractId ? String(e.contractId) : '',
+          inSuccessfulContractCall: e.inSuccessfulContractCall !== false,
+          topic: (e.topic ?? []).map((t: any) =>
+            typeof t === 'string' ? xdr.ScVal.fromXDR(t, 'base64') : t,
+          ),
+          value:
+            typeof e.value === 'string'
+              ? xdr.ScVal.fromXDR(e.value, 'base64')
+              : e.value,
+        }),
+      ),
+      cursor: response.cursor,
+      latestLedger: response.latestLedger,
+    };
   }
 
   /**

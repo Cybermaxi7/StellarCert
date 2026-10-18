@@ -957,6 +957,33 @@ export class CertificateService {
       .getMany();
   }
 
+  async findForRecipient(
+    recipientId: string,
+    page = 1,
+    limit = 10,
+    email?: string,
+  ): Promise<Certificate[]> {
+    const qb = this.certificateRepository
+      .createQueryBuilder('certificate')
+      .leftJoinAndSelect('certificate.issuer', 'issuer');
+
+    if (email) {
+      qb.where(
+        '(certificate.recipientId = :recipientId OR certificate.recipientEmail = :email)',
+        { recipientId, email },
+      );
+    } else {
+      qb.where('certificate.recipientId = :recipientId', { recipientId });
+    }
+
+    return qb
+      .orderBy('certificate.issuedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+  }
+
+
   async getCertificateQrCode(id: string): Promise<any> {
     const certificate = await this.findOne(id);
     const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify/${certificate.verificationCode}`;

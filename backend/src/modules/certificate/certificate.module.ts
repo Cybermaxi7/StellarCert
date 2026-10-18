@@ -2,6 +2,11 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bull';
+import {
+  ChainReconciliationProcessor,
+  CHAIN_RECONCILIATION_QUEUE,
+} from './services/chain-reconciliation.processor';
 
 import { Certificate } from './entities/certificate.entity';
 import { Verification } from './entities/verification.entity';
@@ -42,6 +47,7 @@ import { EmailModule } from '../email/email.module';
       max: 100,
     }),
     ConfigModule,
+    BullModule.registerQueue({ name: CHAIN_RECONCILIATION_QUEUE }),
     MetadataSchemaModule,
     forwardRef(() => AuthModule),
     WebhooksModule,
@@ -64,6 +70,7 @@ import { EmailModule } from '../email/email.module';
     CertificatePdfService,
     CertificateTransferService,
     CertificateMapper,
+    ChainReconciliationProcessor,
   ],
   exports: [
     CertificateService,

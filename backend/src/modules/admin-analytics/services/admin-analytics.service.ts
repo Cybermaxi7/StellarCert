@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual, Between } from 'typeorm';
+import { Repository, MoreThanOrEqual, Between, IsNull } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { User, UserRole, UserStatus } from '../../users/entities/user.entity';
@@ -74,6 +74,7 @@ export class AdminAnalyticsService {
       userRegistrationTrend,
       certificateIssuanceTrend,
       totalIssuers,
+      certificatesMissingChainHash,
     ] = await Promise.all([
       this.getUsersByRole(),
       this.getUsersByStatus(),
@@ -83,6 +84,10 @@ export class AdminAnalyticsService {
       this.getUserRegistrationTrend(dateFilter),
       this.getCertificateIssuanceTrend(dateFilter),
       this.issuerRepo.count({ where: { isActive: true } }),
+      // Not date-filtered: this is a backlog the reconciliation worker drains.
+      this.certificateRepo.count({
+        where: { status: 'active' as any, stellarTransactionHash: IsNull() },
+      }),
     ]);
 
     const result: AdminAnalyticsDto = {
@@ -94,6 +99,7 @@ export class AdminAnalyticsService {
       userRegistrationTrend,
       certificateIssuanceTrend,
       totalIssuers,
+      certificatesMissingChainHash,
     };
 
     // Cache the result

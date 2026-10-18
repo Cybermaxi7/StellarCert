@@ -159,4 +159,10 @@ export class AdminAnalyticsDto {
 
   @ApiPropertyOptional({ description: 'Total number of issuers in system' })
   totalIssuers: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Active certificates with no Stellar transaction hash (awaiting chain reconciliation)',
+  })
+  certificatesMissingChainHash: number;
 }

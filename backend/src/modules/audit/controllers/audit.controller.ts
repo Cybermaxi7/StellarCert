@@ -45,6 +45,8 @@ export class AuditController {
    * Search and filter audit logs.
    */
   @Get('logs')
+  @Get('search')
+  @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Search audit logs',

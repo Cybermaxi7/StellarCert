@@ -1115,9 +1115,14 @@ export const dailyCertificateVerification =
       await simulateDelay();
       return { count: Math.floor(Math.random() * 50) + 20 };
     }
-    return apiClient<DailyVerificationStats>(
-      "/certificates/stats/daily-verification",
-    );
+    const stats = await apiClient<{
+      verificationStats?: { dailyVerifications?: number };
+      count?: number;
+    }>("/certificates/stats");
+    return {
+      count:
+        stats.verificationStats?.dailyVerifications ?? stats.count ?? 0,
+    };
   };
 
 export const totalCertificates = async (): Promise<TotalCertificatesStats> => {
@@ -1125,7 +1130,11 @@ export const totalCertificates = async (): Promise<TotalCertificatesStats> => {
     await simulateDelay();
     return { total: dummyData.certificates.length };
   }
-  return apiClient<TotalCertificatesStats>("/certificates/stats/total");
+  const stats = await apiClient<{
+    totalCertificates?: number;
+    total?: number;
+  }>("/certificates/stats");
+  return { total: stats.totalCertificates ?? stats.total ?? 0 };
 };
 
 export const totalActiveUsers = async (): Promise<TotalActiveUsersStats> => {
@@ -1443,9 +1452,34 @@ export const dashboardApi = {
         },
       ];
     }
-    return apiClient<ActivityItem[]>(
-      `/admin/analytics/activity?limit=${limit}`,
+    const response = await apiClient<{ data?: AuditLogItem[] } | AuditLogItem[]>(
+      `/audit/logs?limit=${limit}`,
     );
+    const logs = Array.isArray(response) ? response : response.data || [];
+    return logs.map((log) => {
+      let type: "issue" | "verify" | "revoke" = "issue";
+      const actionLower = (log.action || "").toLowerCase();
+      if (actionLower.includes("revoke")) {
+        type = "revoke";
+      } else if (
+        actionLower.includes("verify") ||
+        actionLower.includes("verified") ||
+        actionLower.includes("check")
+      ) {
+        type = "verify";
+      }
+      return {
+        id: log.id,
+        type,
+        date: new Date(
+          Number(log.timestamp) || log.createdAt || Date.now(),
+        ).toISOString(),
+        description:
+          log.description ||
+          log.errorMessage ||
+          `${String(log.action).replace(/_/g, " ")} by ${log.userEmail || "unknown"}`,
+      };
+    });
   },
 };
 
@@ -1461,7 +1495,9 @@ export const auditApi = {
         if (value) searchParams.append(key, String(value));
       });
     }
-    return apiClient<PaginatedActivityLog>(`/audit?${searchParams.toString()}`);
+    return apiClient<PaginatedActivityLog>(
+      `/audit/logs?${searchParams.toString()}`,
+    );
   },
   getCertificateHistory: async (
     certificateId: string,
@@ -1536,7 +1572,7 @@ export const auditApi = {
       };
     }
 
-    return apiClient(`/audit/search?${searchParams.toString()}`);
+    return apiClient(`/audit/logs?${searchParams.toString()}`);
   },
   getStatistics: async (
     params?: Record<string, string | number | boolean | undefined>,

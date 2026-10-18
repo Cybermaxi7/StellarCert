@@ -49,9 +49,7 @@ const IssueCertificate = () => {
 
   useEffect(() => {
     if (user) {
-      const fullName = ('firstName' in user && 'lastName' in user)
-        ? `${(user as { firstName: string }).firstName} ${(user as { lastName: string }).lastName}`.trim()
-        : ('name' in user ? (user as { name: string }).name : '');
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
       setFormData(prev => ({ ...prev, issuerName: fullName }));
     }
   }, [user]);

@@ -28,6 +28,7 @@ import { AuditModule } from '../audit/audit.module';
 import { FilesModule } from '../files/files.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EmailModule } from '../email/email.module';
+import { CertificateExpirationJob } from './jobs/certificate-expiration.job';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { EmailModule } from '../email/email.module';
     CertificatePdfService,
     CertificateTransferService,
     CertificateMapper,
+    CertificateExpirationJob,
   ],
   exports: [
     CertificateService,

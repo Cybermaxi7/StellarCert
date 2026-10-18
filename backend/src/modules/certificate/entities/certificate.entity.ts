@@ -157,6 +157,7 @@ export class Certificate {
   issuedAt: Date;
 
   @Column({ type: 'timestamp', nullable: true })
+  @Index('IDX_certificates_expires_at')
   expiresAt?: Date;
 
   @UpdateDateColumn()

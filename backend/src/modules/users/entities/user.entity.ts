@@ -99,6 +99,10 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   refreshToken: string | null;
 
+  /** Bumped to invalidate all outstanding access tokens (#1184). */
+  @Column({ type: 'int', default: 0 })
+  tokenVersion: number;
+
   @Column({ type: 'timestamp', nullable: true })
   refreshTokenExpires: Date | null;
 

@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, Inject, Optional } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PUBLIC_KEY } from '../decorators/public.decorator';
@@ -77,6 +77,7 @@ export class JwtAuthGuard implements CanActivate {
         sub: payload.sub,
         email: payload.email,
         role: payload.role,
+        tokenVersion: payload.ver ?? payload.tokenVersion ?? 0,
       };
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'TokenExpiredError') {

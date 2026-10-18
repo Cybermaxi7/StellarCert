@@ -1577,3 +1577,27 @@ export const auditApi = {
     return `${API_URL}/audit/export${query ? `?${query}` : ""}`;
   },
 };
+
+// ─── Account security / sessions (#1184) ─────────────────────────────────────
+
+export interface AuthSessionDto {
+  id: string;
+  device: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  current: boolean;
+}
+
+export const listSessions = async (): Promise<AuthSessionDto[]> => {
+  return apiClient<AuthSessionDto[]>("/auth/sessions");
+};
+
+export const revokeSession = async (sessionId: string): Promise<void> => {
+  await apiClient<void>(`/auth/sessions/${sessionId}`, { method: "DELETE" });
+};
+
+export const revokeAllSessions = async (): Promise<{ revoked: number }> => {
+  return apiClient<{ revoked: number }>("/auth/sessions", { method: "DELETE" });
+};

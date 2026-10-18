@@ -385,6 +385,34 @@ export class CertificateService {
     return certificate;
   }
 
+
+  /**
+   * Lookup by serial number scoped to the caller's own certificates (#1146).
+   * Admins may look up any serial.
+   */
+  async findBySerialNumber(
+    serialNumber: string,
+    requesterId: string,
+    requesterRole: string,
+  ): Promise<Certificate> {
+    const certificate = await this.certificateRepository.findOne({
+      where: { serialNumber },
+      relations: ['issuer'],
+    });
+    if (!certificate) {
+      throw new NotFoundException(
+        `Certificate with serial "${serialNumber}" not found`,
+      );
+    }
+    const isAdmin = requesterRole === 'admin' || requesterRole === 'ADMIN';
+    if (!isAdmin && certificate.issuerId !== requesterId) {
+      throw new NotFoundException(
+        `Certificate with serial "${serialNumber}" not found`,
+      );
+    }
+    return certificate;
+  }
+
   async findByVerificationCode(verificationCode: string): Promise<Certificate> {
     const certificate = await this.certificateRepository
       .createQueryBuilder('certificate')

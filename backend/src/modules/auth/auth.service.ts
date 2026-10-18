@@ -73,7 +73,7 @@ export class AuthService {
       return { requires2FA: true, preAuthToken } as any;
     }
 
-    const payload = { email: user.email, sub: user.id, role: user.role };
+    const payload = { email: user.email, sub: user.id, role: user.role, ver: user.tokenVersion ?? 0 };
     const accessToken =
       await this.jwtManagementService.generateAccessToken(payload);
     const refreshToken =

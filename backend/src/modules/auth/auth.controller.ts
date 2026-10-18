@@ -1,5 +1,8 @@
 import {
   Controller,
+  Get,
+  Delete,
+  Param,
   Post,
   Body,
   HttpCode,
@@ -23,6 +26,8 @@ import { TwoFactorTokenDto } from './dto/two-factor-token.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { RateLimit } from '../security/decorators/rate-limit.decorator';
+import { SessionsService } from './services/sessions.service';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 const REFRESH_COOKIE = 'refreshToken';
 const refreshCookieOptions = (isProduction: boolean) => ({
@@ -40,6 +45,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private twoFactorService: TwoFactorService,
+    private sessionsService: SessionsService,
   ) {}
 
   @Post('login')
@@ -179,4 +185,37 @@ export class AuthController {
   ): Promise<{ backupCodes: string[] }> {
     return this.twoFactorService.regenerateBackupCodes(req.user.id, dto.token);
   }
+
+
+  /** #1184 — list active sessions for the current user */
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  async listSessions(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const currentRefresh = req.cookies?.[REFRESH_COOKIE] as string | undefined;
+    return this.sessionsService.listForUser(userId, currentRefresh);
+  }
+
+  /** #1184 — revoke a single session */
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async revokeSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+  ) {
+    await this.sessionsService.revokeSession(userId, sessionId);
+  }
+
+  /** #1184 — sign out everywhere (all sessions + bump tokenVersion) */
+  @Delete('sessions')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async revokeAllSessions(@CurrentUser('id') userId: string) {
+    const count = await this.sessionsService.revokeAll(userId);
+    return { revoked: count };
+  }
+
 }

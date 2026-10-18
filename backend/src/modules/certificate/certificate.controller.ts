@@ -128,6 +128,31 @@ export class CertificateController {
     return this.certificateService.search(dto);
   }
 
+
+  // ─── Lookup by serial (#1146) ───────────────────────────────────────────────
+  // MUST be registered before @Get(':id') so "serial" is not parsed as an id.
+
+  @Get('serial/:serialNumber')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.ISSUER)
+  @ApiOperation({
+    summary: 'Find a certificate by serial number (scoped to caller)',
+  })
+  @ApiParam({ name: 'serialNumber', description: 'Certificate serial number' })
+  @ApiResponse({ status: 200, description: 'Certificate found' })
+  @ApiResponse({ status: 404, description: 'Certificate not found' })
+  async findBySerialNumber(
+    @Param('serialNumber') serialNumber: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const cert = await this.certificateService.findBySerialNumber(
+      serialNumber,
+      user.id,
+      user.role,
+    );
+    return this.mapper.toResponse(cert);
+  }
+
   // ─── Statistics ──────────────────────────────────────────────────────────────
 
   @Get('stats/summary')

@@ -92,23 +92,30 @@ async function bootstrap() {
     new MonitoringInterceptor(metricsService, sentryService, loggingService),
   );
 
-  // Swagger setup
-  const config = new DocumentBuilder()
-    .setTitle('StellarCert API')
-    .setDescription('Certificate Management System API Documentation')
-    .setVersion('1.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'access-token',
-    )
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'none',
-    },
-  });
+  // Swagger setup: off in production unless SWAGGER_ENABLED=true
+  const swaggerFlag = process.env.SWAGGER_ENABLED;
+  const swaggerEnabled =
+    swaggerFlag !== undefined && swaggerFlag !== ''
+      ? swaggerFlag.toLowerCase() === 'true'
+      : process.env.NODE_ENV !== 'production';
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('StellarCert API')
+      .setDescription('Certificate Management System API Documentation')
+      .setVersion('1.0')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'access-token',
+      )
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'none',
+      },
+    });
+  }
 
   // Enable graceful shutdown hooks
   app.enableShutdownHooks();

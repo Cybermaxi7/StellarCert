@@ -27,6 +27,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { AdminAnalyticsModule } from './modules/admin-analytics/admin-analytics.module';
 import { SecurityModule } from './modules/security/security.module';
 import { MultisigModule } from './modules/multisig/multisig.module';
+import { RateLimitStoreModule } from './common/rate-limiting/rate-limit-store.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { MultisigModule } from './modules/multisig/multisig.module';
     }),
     TypeOrmModule.forRoot(typeOrmConfig),
     CommonModule,
+    RateLimitStoreModule,
     VersioningModule,
     HealthModule,
     AuthModule,

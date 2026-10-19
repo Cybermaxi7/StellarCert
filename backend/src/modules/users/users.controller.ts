@@ -66,6 +66,7 @@ import { ProfilePictureUploadResponseDto } from './dto/upload-profile-picture.dt
 import { StorageService } from '../files/services/storage.service';
 import { maxFileSize, allowedImageMimeTypes } from 'src/common/constants';
 import { Public } from 'src/common/decorators/public.decorator';
+import { profilePictureKey, storageKeyFor } from './profile-picture.util';
 
 @ApiTags('Users')
 @Controller('users')
@@ -221,7 +222,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getProfile(@CurrentUser('id') userId: string) {
-    return this.usersService.getProfile(userId);
+    return this.withPictureUrl(await this.usersService.getProfile(userId));
   }
 
   @Put('profile')
@@ -242,7 +243,9 @@ export class UsersController {
     @CurrentUser('id') userId: string,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    return this.usersService.updateProfile(userId, updateProfileDto);
+    return this.withPictureUrl(
+      await this.usersService.updateProfile(userId, updateProfileDto),
+    );
   }
 
   @Post('profile/picture')
@@ -278,8 +281,8 @@ export class UsersController {
       );
     }
 
-    const extension = file.originalname.split('.').pop();
-    const key = `profile-pictures/${userId}-${Date.now()}.${extension}`;
+    // The extension is derived from the validated MIME type, not the client's file name.
+    const key = profilePictureKey(userId, file.mimetype);
 
     const { url } = await this.storageService.uploadFile(
       file.buffer,
@@ -288,14 +291,35 @@ export class UsersController {
       key,
     );
 
+    // Persist the object key. The signed URL in the response expires; the key does not.
     await this.usersService.updateProfile(userId, {
-      profilePicture: url,
+      profilePicture: key,
     });
 
     return {
       profilePicture: url,
       message: 'Profile picture uploaded successfully',
     };
+  }
+
+  /** Replace a stored picture key with a freshly signed URL for the response. */
+  private async withPictureUrl<T extends { profilePicture?: string | null }>(
+    user: T,
+  ): Promise<T> {
+    const key = storageKeyFor(user?.profilePicture);
+    if (!key) {
+      return user?.profilePicture
+        ? Object.assign(user, { profilePicture: null })
+        : user;
+    }
+    try {
+      return Object.assign(user, {
+        profilePicture: await this.storageService.getSignedUrl(key),
+      });
+    } catch {
+      // Storage not configured or unreachable: the profile is still usable without a picture.
+      return Object.assign(user, { profilePicture: null });
+    }
   }
 
   @Delete('profile')

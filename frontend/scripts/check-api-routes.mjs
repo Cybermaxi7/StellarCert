@@ -98,7 +98,7 @@ while ((fMatch = apiCallRegex.exec(endpointsContent)) !== null) {
   if (raw.includes('AUTH_ENDPOINTS')) continue;
 
   // Strip baseUrl variable or literal host if present
-  raw = raw.replace(/^\$\{[A-Za-z0-9_]+\}/, '').replace(/^https?:\/\/[^\/]+/, '');
+  raw = raw.replace(/^\$\{[A-Za-z0-9_]+\}/, '').replace(/^https?:\/\/[^/]+/, '');
 
   // Strip query string
   raw = raw.split('?')[0];

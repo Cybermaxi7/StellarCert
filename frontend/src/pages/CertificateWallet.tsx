@@ -23,7 +23,10 @@ import {
   getCertificatePdfUrl,
 } from "../api";
 import { UserRole, User } from "../api/types";
-import { useMyCertificatesQuery, useUserCertificatesQuery } from "../api/queries";
+import {
+  useMyCertificatesQuery,
+  useUserCertificatesQuery,
+} from "../api/queries";
 import { useAuth } from "../context/AuthContext";
 
 /**
@@ -48,13 +51,28 @@ const CertificateWallet = () => {
 
   // For recipient/user accounts, securely fetch certificates via GET /certificates/me (IDOR-safe).
   // For admin/issuer testing or inspecting, fallback to useUserCertificatesQuery.
-  const isRecipientUser = !user?.role || user.role === UserRole.RECIPIENT || user.role === UserRole.USER;
-  const myCertsQuery = useMyCertificatesQuery(isRecipientUser ? user?.id : undefined);
-  const userCertsQuery = useUserCertificatesQuery(!isRecipientUser ? user?.id : undefined);
+  const isRecipientUser =
+    !user?.role ||
+    user.role === UserRole.RECIPIENT ||
+    user.role === UserRole.USER;
+  const myCertsQuery = useMyCertificatesQuery(
+    isRecipientUser ? user?.id : undefined,
+  );
+  const userCertsQuery = useUserCertificatesQuery(
+    !isRecipientUser ? user?.id : undefined,
+  );
 
-  const certificates = isRecipientUser ? (myCertsQuery.data ?? []) : (userCertsQuery.data ?? []);
-  const loading = isRecipientUser ? myCertsQuery.isPending : userCertsQuery.isPending;
-  const certificatesFailed = isRecipientUser ? myCertsQuery.isError : userCertsQuery.isError;
+  const certificates = useMemo(
+    () =>
+      isRecipientUser ? (myCertsQuery.data ?? []) : (userCertsQuery.data ?? []),
+    [isRecipientUser, myCertsQuery.data, userCertsQuery.data],
+  );
+  const loading = isRecipientUser
+    ? myCertsQuery.isPending
+    : userCertsQuery.isPending;
+  const certificatesFailed = isRecipientUser
+    ? myCertsQuery.isError
+    : userCertsQuery.isError;
 
   // QR states
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
@@ -65,7 +83,9 @@ const CertificateWallet = () => {
   const [sharingCert, setSharingCert] = useState<Certificate | null>(null);
 
   // Transfer states
-  const [pendingTransfers, setPendingTransfers] = useState<CertificateTransfer[]>([]);
+  const [pendingTransfers, setPendingTransfers] = useState<
+    CertificateTransfer[]
+  >([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -84,7 +104,7 @@ const CertificateWallet = () => {
     return () => {
       isMounted = false;
     };
-  }, [user?.id, user?.email]);
+  }, [user]);
 
   // Only the list request feeds the banner; the QR/PDF actions keep their own
   // message so a failed download never masquerades as a failed page load. The
@@ -160,7 +180,6 @@ const CertificateWallet = () => {
       await copyToClipboard();
     }
   };
-
 
   // ✅ PDF VIEW/DOWNLOAD LOGIC
   const handlePdfAction = async (
@@ -295,7 +314,9 @@ const CertificateWallet = () => {
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center gap-4 mb-8">
         <Wallet className="w-10 h-10 text-blue-600 dark:text-blue-400" />
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Certificate Wallet</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Certificate Wallet
+        </h1>
       </div>
 
       {error && (
@@ -308,7 +329,9 @@ const CertificateWallet = () => {
       {loading ? (
         <div className="text-center py-12">
           <div className="animate-spin h-12 w-12 border-b-2 border-blue-600 rounded-full mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading certificates...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">
+            Loading certificates...
+          </p>
         </div>
       ) : certificates.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-gray-900 rounded-lg shadow-md dark:shadow-none dark:border dark:border-gray-800">
@@ -324,9 +347,14 @@ const CertificateWallet = () => {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedCertificates.map((cert) => (
-              <div key={cert.id} className="bg-white dark:bg-gray-900 rounded-lg shadow-md dark:shadow-none dark:border dark:border-gray-800 p-6">
+              <div
+                key={cert.id}
+                className="bg-white dark:bg-gray-900 rounded-lg shadow-md dark:shadow-none dark:border dark:border-gray-800 p-6"
+              >
                 <div className="flex justify-between items-start mb-4 gap-2">
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{cert.title}</h3>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {cert.title}
+                  </h3>
                   <div className="flex flex-col items-end gap-1">
                     <span
                       className={`px-2 py-1 text-sm rounded ${getStatusBadgeClass(
@@ -336,7 +364,9 @@ const CertificateWallet = () => {
                       {cert.status}
                     </span>
                     {(() => {
-                      const transfer = pendingTransfers.find((t) => t.certificateId === cert.id);
+                      const transfer = pendingTransfers.find(
+                        (t) => t.certificateId === cert.id,
+                      );
                       if (!transfer) return null;
                       return (
                         <span
@@ -361,7 +391,9 @@ const CertificateWallet = () => {
 
                 {(() => {
                   const owner = !!user && isCertOwner(cert, user);
-                  const canDownload = owner || (!!user && DOWNLOAD_ROLES.includes(user.role as UserRole));
+                  const canDownload =
+                    owner ||
+                    (!!user && DOWNLOAD_ROLES.includes(user.role as UserRole));
                   const canShare = owner;
                   const readOnly = !canDownload && !canShare;
 
@@ -432,7 +464,8 @@ const CertificateWallet = () => {
                       {/* Inform non-owners (e.g. verifiers) that they have read-only access */}
                       {readOnly && (
                         <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-                          View-only — download and share are available to the certificate owner.
+                          View-only — download and share are available to the
+                          certificate owner.
                         </p>
                       )}
                     </div>
@@ -441,7 +474,6 @@ const CertificateWallet = () => {
               </div>
             ))}
           </div>
-
 
           <div className="mt-6 px-2 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-2">
@@ -502,7 +534,9 @@ const CertificateWallet = () => {
         >
           <div className="bg-white dark:bg-gray-900 p-6 rounded-lg max-w-sm w-full dark:border dark:border-gray-800">
             <div className="flex justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Certificate QR Code</h3>
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                Certificate QR Code
+              </h3>
               <button
                 onClick={() => setSelectedQR(null)}
                 aria-label="Close QR modal"
@@ -572,7 +606,9 @@ const CertificateWallet = () => {
                   />
                   <button
                     onClick={async () => {
-                      await navigator.clipboard.writeText(getVerificationUrl(sharingCert));
+                      await navigator.clipboard.writeText(
+                        getVerificationUrl(sharingCert),
+                      );
                       setShareLinkCopied(true);
                       setTimeout(() => setShareLinkCopied(false), 2000);
                     }}
@@ -604,7 +640,7 @@ const CertificateWallet = () => {
                   Open verification page
                 </a>
 
-                {typeof navigator.share === 'function' && (
+                {typeof navigator.share === "function" && (
                   <button
                     onClick={() => handleShare(sharingCert)}
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400"
@@ -619,7 +655,6 @@ const CertificateWallet = () => {
         </div>
       )}
     </div>
-
   );
 };
 

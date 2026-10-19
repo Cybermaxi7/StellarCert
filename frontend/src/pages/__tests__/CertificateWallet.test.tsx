@@ -32,7 +32,11 @@ vi.mock("../../components/QRCodeModal", () => ({
 // (which legitimately triggers the user-dependent re-fetch).
 const { walletAuth } = vi.hoisted(() => ({
   walletAuth: {
-    user: { id: "u1", role: "recipient", email: "alice@example.com" } as any,
+    user: { id: "u1", role: "recipient", email: "alice@example.com" } as {
+      id: string;
+      role: string;
+      email: string;
+    },
   },
 }));
 
@@ -41,8 +45,15 @@ vi.mock("../../context/AuthContext", () => ({
 }));
 
 import CertificateWallet from "../CertificateWallet";
-import { getMyCertificates, getUserCertificates, certificateApi } from "../../api/endpoints";
-import { createTestQueryClient, renderWithProviders } from "../../test/renderWithProviders";
+import {
+  getMyCertificates,
+  getUserCertificates,
+  certificateApi,
+} from "../../api/endpoints";
+import {
+  createTestQueryClient,
+  renderWithProviders,
+} from "../../test/renderWithProviders";
 
 // Typed reference to the mocked function for easy per-test overrides
 const mockedGetMyCertificates = getMyCertificates as Mock;
@@ -62,7 +73,11 @@ const MOCK_CERT = {
 
 describe("CertificateWallet", () => {
   beforeEach(() => {
-    walletAuth.user = { id: "u1", role: "recipient", email: "alice@example.com" };
+    walletAuth.user = {
+      id: "u1",
+      role: "recipient",
+      email: "alice@example.com",
+    };
     mockedGetMyCertificates.mockResolvedValue([MOCK_CERT]);
     mockedGetUserCertificates.mockResolvedValue([MOCK_CERT]);
     mockedGetPendingTransfers.mockResolvedValue([]);
@@ -76,22 +91,22 @@ describe("CertificateWallet", () => {
   it("renders certificates when fetch succeeds", async () => {
     mockedGetMyCertificates.mockResolvedValueOnce([MOCK_CERT]);
 
-    renderWithProviders(<CertificateWallet />, { queryClient: createTestQueryClient() });
+    renderWithProviders(<CertificateWallet />, {
+      queryClient: createTestQueryClient(),
+    });
 
     await waitFor(() =>
-      expect(
-        screen.getByText(/Blockchain Fundamentals/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Blockchain Fundamentals/i)).toBeInTheDocument(),
     );
   });
 
   // ── Issue #568 fix ──────────────────────────────────────────────────────
   it("displays a visible error message when certificate fetch fails", async () => {
-    mockedGetMyCertificates.mockRejectedValueOnce(
-      new Error("Network error"),
-    );
+    mockedGetMyCertificates.mockRejectedValueOnce(new Error("Network error"));
 
-    renderWithProviders(<CertificateWallet />, { queryClient: createTestQueryClient() });
+    renderWithProviders(<CertificateWallet />, {
+      queryClient: createTestQueryClient(),
+    });
 
     // The error banner must appear — not just a silent console.error
     await waitFor(() =>
@@ -109,9 +124,7 @@ describe("CertificateWallet", () => {
   // ── Retry clears previous error ─────────────────────────────────────────
   it("clears a previous fetch error when re-fetch succeeds", async () => {
     // First call fails
-    mockedGetMyCertificates.mockRejectedValueOnce(
-      new Error("Network error"),
-    );
+    mockedGetMyCertificates.mockRejectedValueOnce(new Error("Network error"));
 
     // `rerender` re-applies the provider wrapper, so the cache survives.
     const { rerender } = renderWithProviders(<CertificateWallet />, {
@@ -137,42 +150,50 @@ describe("CertificateWallet", () => {
       ).not.toBeInTheDocument(),
     );
 
-    expect(await screen.findByText(/Blockchain Fundamentals/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Blockchain Fundamentals/i),
+    ).toBeInTheDocument();
   });
 
   // ── Dark mode fix (#795) ────────────────────────────────────────────────
   it("renders with correct dark mode classes", async () => {
     mockedGetMyCertificates.mockResolvedValueOnce([MOCK_CERT]);
 
-    renderWithProviders(<CertificateWallet />, { queryClient: createTestQueryClient() });
+    renderWithProviders(<CertificateWallet />, {
+      queryClient: createTestQueryClient(),
+    });
 
     await waitFor(() =>
-      expect(screen.getByText(/Blockchain Fundamentals/i)).toBeInTheDocument()
+      expect(screen.getByText(/Blockchain Fundamentals/i)).toBeInTheDocument(),
     );
 
-    const card = screen.getByText(/Blockchain Fundamentals/i).closest('.bg-white');
-    expect(card).toHaveClass('dark:bg-gray-900');
-    
-    const title = screen.getByText(/Blockchain Fundamentals/i);
-    expect(title).toHaveClass('dark:text-white');
+    const card = screen
+      .getByText(/Blockchain Fundamentals/i)
+      .closest(".bg-white");
+    expect(card).toHaveClass("dark:bg-gray-900");
 
-    const statusBadge = screen.getByText('active');
-    expect(statusBadge).toHaveClass('dark:bg-green-900/30');
-    expect(statusBadge).toHaveClass('dark:text-green-400');
+    const title = screen.getByText(/Blockchain Fundamentals/i);
+    expect(title).toHaveClass("dark:text-white");
+
+    const statusBadge = screen.getByText("active");
+    expect(statusBadge).toHaveClass("dark:bg-green-900/30");
+    expect(statusBadge).toHaveClass("dark:text-green-400");
   });
 
   it("renders empty state with correct classes", async () => {
     mockedGetMyCertificates.mockResolvedValueOnce([]);
 
-    renderWithProviders(<CertificateWallet />, { queryClient: createTestQueryClient() });
+    renderWithProviders(<CertificateWallet />, {
+      queryClient: createTestQueryClient(),
+    });
 
     await waitFor(() =>
-      expect(screen.getByText(/No Certificates Yet/i)).toBeInTheDocument()
+      expect(screen.getByText(/No Certificates Yet/i)).toBeInTheDocument(),
     );
 
     const heading = screen.getByText(/No Certificates Yet/i);
-    expect(heading).toHaveClass('text-gray-900');
-    expect(heading).toHaveClass('dark:text-white');
+    expect(heading).toHaveClass("text-gray-900");
+    expect(heading).toHaveClass("dark:text-white");
   });
 
   // ── Transfer status and Share Links ──────────────────────────────────────
@@ -188,10 +209,12 @@ describe("CertificateWallet", () => {
       },
     ]);
 
-    renderWithProviders(<CertificateWallet />, { queryClient: createTestQueryClient() });
+    renderWithProviders(<CertificateWallet />, {
+      queryClient: createTestQueryClient(),
+    });
 
     await waitFor(() =>
-      expect(screen.getByTestId("transfer-status-cert1")).toBeInTheDocument()
+      expect(screen.getByTestId("transfer-status-cert1")).toBeInTheDocument(),
     );
     expect(screen.getByText(/Transfer: pending/i)).toBeInTheDocument();
   });
@@ -205,21 +228,27 @@ describe("CertificateWallet", () => {
       },
     });
 
-    renderWithProviders(<CertificateWallet />, { queryClient: createTestQueryClient() });
+    renderWithProviders(<CertificateWallet />, {
+      queryClient: createTestQueryClient(),
+    });
 
     await waitFor(() =>
-      expect(screen.getByText(/Blockchain Fundamentals/i)).toBeInTheDocument()
+      expect(screen.getByText(/Blockchain Fundamentals/i)).toBeInTheDocument(),
     );
 
     const shareLinkBtn = screen.getByTitle("Share Link");
     fireEvent.click(shareLinkBtn);
 
-    expect(await screen.findByRole("dialog", { name: /Share certificate links/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: /Share certificate links/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Public Verification Link/i)).toBeInTheDocument();
 
     const copyBtn = screen.getByRole("button", { name: /Copy/i });
     fireEvent.click(copyBtn);
 
-    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/verify?serial=CERT-2026-001"));
+    expect(writeTextMock).toHaveBeenCalledWith(
+      expect.stringContaining("/verify?serial=CERT-2026-001"),
+    );
   });
 });

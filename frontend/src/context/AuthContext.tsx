@@ -1,20 +1,28 @@
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { User } from '../api/types';
-import { tokenStorage, subscribeTokenRefresh } from '../api/tokens';
-import { authApi } from '../api/endpoints';
-import { queryKeys } from '../api/queries';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  ReactNode,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { User } from "../api/types";
+import { tokenStorage, subscribeTokenRefresh } from "../api/tokens";
+import { authApi } from "../api/endpoints";
+import { queryKeys } from "../api/queries";
 
 // Helper function to decode JWT payload safely (handling base64url characters - and _ and missing padding)
-export const decodeJwtPayload = (token: string): any => {
-  const parts = token.split('.');
+export const decodeJwtPayload = (token: string): Record<string, unknown> => {
+  const parts = token.split(".");
   if (parts.length < 2) {
-    throw new Error('Invalid JWT format');
+    throw new Error("Invalid JWT format");
   }
-  let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+  let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
   const padLength = (4 - (base64.length % 4)) % 4;
-  base64 += '='.repeat(padLength);
+  base64 += "=".repeat(padLength);
 
   let jsonStr: string;
   try {
@@ -22,9 +30,9 @@ export const decodeJwtPayload = (token: string): any => {
       Array.prototype.map
         .call(
           atob(base64),
-          (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2),
+          (c: string) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2),
         )
-        .join(''),
+        .join(""),
     );
   } catch {
     jsonStr = atob(base64);
@@ -37,7 +45,7 @@ export const decodeJwtPayload = (token: string): any => {
 export const isTokenExpired = (token: string): boolean => {
   try {
     const payload = decodeJwtPayload(token);
-    if (!payload || typeof payload.exp !== 'number') {
+    if (!payload || typeof payload.exp !== "number") {
       return true;
     }
     const currentTime = Date.now() / 1000;
@@ -61,11 +69,13 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const useAuth = (): AuthContextValue => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [user, setUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // Track the access token in React state so `isAuthenticated` is reactive.
@@ -105,7 +115,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = useCallback(
     (nextAccessToken: string, nextUser: User) => {
       if (isTokenExpired(nextAccessToken)) {
-        console.error('Attempted to login with expired token');
+        console.error("Attempted to login with expired token");
         return;
       }
 
@@ -155,26 +165,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     bootstrap();
 
     // Keep AuthContext in sync when apiClient silently refreshes the access token.
-    const unsubscribe = subscribeTokenRefresh((newAccessToken, refreshedUser) => {
-      if (isTokenExpired(newAccessToken)) {
-        return;
-      }
-      setAccessTokenState(newAccessToken);
-      if (refreshedUser) {
-        setUser(refreshedUser);
-      }
-      setIsLoading(false);
-    });
+    const unsubscribe = subscribeTokenRefresh(
+      (newAccessToken, refreshedUser) => {
+        if (isTokenExpired(newAccessToken)) {
+          return;
+        }
+        setAccessTokenState(newAccessToken);
+        if (refreshedUser) {
+          setUser(refreshedUser);
+        }
+        setIsLoading(false);
+      },
+    );
 
     // Set up periodic token expiration check (every 5 minutes)
-    const interval = setInterval(() => {
-      const currentToken = tokenStorage.getAccessToken();
-      if (currentToken && isTokenExpired(currentToken)) {
-        console.warn('Access token expired, clearing authentication state');
-        tokenStorage.clearTokens();
-        clearAuth();
-      }
-    }, 5 * 60 * 1000);
+    const interval = setInterval(
+      () => {
+        const currentToken = tokenStorage.getAccessToken();
+        if (currentToken && isTokenExpired(currentToken)) {
+          console.warn("Access token expired, clearing authentication state");
+          tokenStorage.clearTokens();
+          clearAuth();
+        }
+      },
+      5 * 60 * 1000,
+    );
 
     return () => {
       clearInterval(interval);
@@ -195,7 +210,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await authApi.logout();
     } finally {
       clearAuth();
-      navigate('/');
+      navigate("/");
     }
   }, [navigate, clearAuth]);
   if (isLoading) {

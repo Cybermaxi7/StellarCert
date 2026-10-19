@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { getMetadataArgsStorage } from 'typeorm';
-import { ConvertTimestampsToTimestamptz1783000200000 } from './1783000200000-ConvertTimestampsToTimestamptz';
+import { ConvertTimestampsToTimestamptz1783000200000 } from './migrations/1783000200000-ConvertTimestampsToTimestamptz';
 
 function entityFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -54,7 +54,6 @@ describe('ConvertTimestampsToTimestamptz', () => {
 describe('entity date columns', () => {
   beforeAll(() => {
     for (const file of entityFiles(join(__dirname, '..', '..'))) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require(file);
     }
   });
@@ -75,7 +74,10 @@ describe('entity date columns', () => {
           ) === Date;
         return isDate && type !== 'timestamptz';
       })
-      .map((column) => `${(column.target as Function).name}.${column.propertyName}`);
+      .map(
+        (column) =>
+          `${(column.target as { name: string }).name}.${column.propertyName}`,
+      );
 
     expect(offenders).toEqual([]);
   });

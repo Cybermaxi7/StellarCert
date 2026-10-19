@@ -17,6 +17,7 @@ import { IssueCertificateDto } from './dto/issue-certificate.dto';
 import { RevokeCertificateDto } from './dto/revoke-certificate.dto';
 import { SearchCertificatesDto } from './dto/search-certificates.dto';
 import { Certificate } from './entities/certificate.entity';
+import { PUBLIC_ISSUER_COLUMNS } from './constants/public-issuer-columns';
 import { Verification } from './entities/verification.entity';
 import { CertificateStatus } from './constants/certificate-status.enum';
 import { User } from '../users/entities/user.entity';
@@ -351,7 +352,8 @@ export class CertificateService {
     const safeLimit = Math.min(Math.max(1, limit || 10), MAX_PAGE_LIMIT);
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .orderBy('certificate.issuedAt', 'DESC');
 
     if (issuerId) {
@@ -374,7 +376,8 @@ export class CertificateService {
   async findOne(id: string): Promise<Certificate> {
     const certificate = await this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.id = :id', { id })
       .getOne();
 
@@ -388,7 +391,8 @@ export class CertificateService {
   async findByVerificationCode(verificationCode: string): Promise<Certificate> {
     const certificate = await this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.verificationCode = :verificationCode', {
         verificationCode,
       })
@@ -648,7 +652,8 @@ export class CertificateService {
 
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .orderBy('certificate.issuedAt', 'DESC')
       .take(safeLimit);
 
@@ -684,7 +689,8 @@ export class CertificateService {
 
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .orderBy('certificate.issuedAt', 'DESC')
       .take(maxLimit);
 
@@ -757,7 +763,8 @@ export class CertificateService {
 
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .orderBy('certificate.issuedAt', 'DESC')
       .take(maxLimit);
 
@@ -869,7 +876,8 @@ export class CertificateService {
   ): Promise<Certificate[]> {
     return this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.recipientEmail = :email', { email })
       .orderBy('certificate.issuedAt', 'DESC')
       .skip((page - 1) * limit)
@@ -884,7 +892,8 @@ export class CertificateService {
   ): Promise<Certificate[]> {
     return this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.issuerId = :issuerId', { issuerId })
       .orderBy('certificate.issuedAt', 'DESC')
       .skip((page - 1) * limit)
@@ -895,7 +904,8 @@ export class CertificateService {
   async getDuplicateCertificates(): Promise<Certificate[]> {
     return this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.isDuplicate = :isDuplicate', { isDuplicate: true })
       .orderBy('certificate.issuedAt', 'DESC')
       .getMany();
@@ -905,7 +915,8 @@ export class CertificateService {
   async search(dto: SearchCertificatesDto): Promise<any> {
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer');
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS);
 
     if ((dto as any).search) {
       queryBuilder.andWhere(
@@ -967,7 +978,8 @@ export class CertificateService {
   ): Promise<Certificate[]> {
     return this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.recipientId = :userId', { userId })
       .orderBy('certificate.issuedAt', 'DESC')
       .skip((page - 1) * limit)

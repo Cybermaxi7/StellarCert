@@ -96,7 +96,12 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<LogoutResponseDto> {
     res.clearCookie(REFRESH_COOKIE, { path: '/' });
-    return this.authService.logout(req.user, logoutDto);
+    // Revoke the bearer token used for this request, not only one in the body.
+    const bearer = req.headers?.authorization?.split(' ')[1];
+    return this.authService.logout(req.user, {
+      ...logoutDto,
+      accessToken: logoutDto?.accessToken ?? bearer,
+    });
   }
 
   @Post('refresh')

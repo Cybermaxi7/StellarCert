@@ -211,3 +211,40 @@ describe("VerifyCertificate QR scanner integration", () => {
     expect(serialInput.value).toBe("MOCK-SCANNED-ID");
   });
 });
+
+describe("VerifyCertificate committed-serial verification", () => {
+  beforeEach(() => {
+    verifyMock.mockReset();
+    verifyMock.mockResolvedValue(VALID_RESULT);
+  });
+
+  it("does not call the API while typing, only on submit", async () => {
+    renderWithProviders(<VerifyCertificate />, {
+      queryClient: createTestQueryClient(),
+      routerEntries: ["/verify"],
+    });
+
+    const input = screen.getByLabelText(/Certificate Serial Number/i);
+    for (const partial of ["CE", "CERT", "CERT-12", "CERT-123"]) {
+      fireEvent.change(input, { target: { value: partial } });
+    }
+    // Longer than the old 300 ms debounce, which used to fire a lookup here.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(verifyMock).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Verify Certificate/i }),
+    );
+    await waitFor(() => expect(verifyMock).toHaveBeenCalledTimes(1));
+    expect(verifyMock).toHaveBeenCalledWith("CERT-123");
+  });
+
+  it("verifies a serial passed in the URL without a submit", async () => {
+    renderWithProviders(<VerifyCertificate />, {
+      queryClient: createTestQueryClient(),
+      routerEntries: ["/verify?serial=CERT-456"],
+    });
+
+    await waitFor(() => expect(verifyMock).toHaveBeenCalledWith("CERT-456"));
+  });
+});

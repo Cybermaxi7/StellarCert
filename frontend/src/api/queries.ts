@@ -157,12 +157,15 @@ export const useCertificateHistoryQuery = (certificateId: string | null) =>
 /**
  * Verifies a serial number. Keyed by serial, so re-checking the same
  * certificate is answered from cache and in-flight lookups are de-duplicated.
+ *
+ * Callers must commit the serial explicitly (form submit, QR scan or URL
+ * parameter); the query must never be driven by raw keystrokes.
  */
 export const useVerifyCertificateQuery = (serialNumber: string) =>
   useQuery({
     queryKey: queryKeys.certificates.verification(serialNumber),
     queryFn: () => certificateApi.verify(serialNumber),
-    enabled: serialNumber.trim().length > 2,
+    enabled: serialNumber.trim().length > 0,
   });
 
 // ── Templates ──────────────────────────────────────────────────────────────
@@ -229,7 +232,9 @@ export const useUserProfileQuery = () =>
     queryFn: () => userApi.getProfile(),
   });
 
-export const useUserListQuery = (params: Record<string, string | number | boolean>) =>
+export const useUserListQuery = (
+  params: Record<string, string | number | boolean>,
+) =>
   useQuery({
     queryKey: queryKeys.users.list(params),
     queryFn: async (): Promise<User[]> => {
@@ -264,7 +269,8 @@ export const useNotificationsQuery = (enabled: boolean) =>
 export const useNotificationPreferencesQuery = () =>
   useQuery({
     queryKey: queryKeys.notifications.preferences(),
-    queryFn: () => apiClient<NotificationPreferences>("/notifications/preferences"),
+    queryFn: () =>
+      apiClient<NotificationPreferences>("/notifications/preferences"),
   });
 
 // ── Invalidation helpers ───────────────────────────────────────────────────
@@ -286,7 +292,8 @@ export const useInvalidateCertificates = () => {
 
 export const useInvalidateUsers = () => {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.users.root });
+  return () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.users.root });
 };
 
 // ── Mutations ──────────────────────────────────────────────────────────────
@@ -305,13 +312,8 @@ export const useCreateCertificateMutation = () => {
 export const useRevokeCertificateMutation = () => {
   const invalidateCertificates = useInvalidateCertificates();
   return useMutation({
-    mutationFn: ({
-      id,
-      reason,
-    }: {
-      id: string;
-      reason: string;
-    }) => revokeCertificate(id, reason),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      revokeCertificate(id, reason),
     onSuccess: invalidateCertificates,
   });
 };
@@ -349,7 +351,8 @@ export const useFreezeCertificateMutation = () => {
 export const useUnfreezeCertificateMutation = () => {
   const invalidateCertificates = useInvalidateCertificates();
   return useMutation({
-    mutationFn: (certificateId: string) => certificateApi.unfreeze(certificateId),
+    mutationFn: (certificateId: string) =>
+      certificateApi.unfreeze(certificateId),
     onSuccess: invalidateCertificates,
   });
 };
@@ -366,7 +369,8 @@ export const useInitiateTransferMutation = () => {
 export const useApproveTransferMutation = () => {
   const invalidateCertificates = useInvalidateCertificates();
   return useMutation({
-    mutationFn: (data: ApproveTransferDto) => certificateApi.transfer.approve(data),
+    mutationFn: (data: ApproveTransferDto) =>
+      certificateApi.transfer.approve(data),
     onSuccess: invalidateCertificates,
   });
 };
@@ -374,7 +378,8 @@ export const useApproveTransferMutation = () => {
 export const useRejectTransferMutation = () => {
   const invalidateCertificates = useInvalidateCertificates();
   return useMutation({
-    mutationFn: (data: RejectTransferDto) => certificateApi.transfer.reject(data),
+    mutationFn: (data: RejectTransferDto) =>
+      certificateApi.transfer.reject(data),
     onSuccess: invalidateCertificates,
   });
 };
@@ -415,22 +420,30 @@ export const useMarkNotificationReadMutation = () => {
     mutationFn: (id: string) =>
       apiClient(`/notifications/${id}/read`, { method: "PATCH" }),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.list() });
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.notifications.list(),
+      });
       const previous = queryClient.getQueryData<Notification[]>(
         queryKeys.notifications.list(),
       );
       queryClient.setQueryData<Notification[]>(
         queryKeys.notifications.list(),
         (current) =>
-          current?.map((n) => (n.id === id ? { ...n, isRead: true } : n)) ?? current,
+          current?.map((n) => (n.id === id ? { ...n, isRead: true } : n)) ??
+          current,
       );
       return { previous };
     },
     onError: (_error, _id, context) => {
-      queryClient.setQueryData(queryKeys.notifications.list(), context?.previous);
+      queryClient.setQueryData(
+        queryKeys.notifications.list(),
+        context?.previous,
+      );
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.list(),
+      });
     },
   });
 };
@@ -440,7 +453,9 @@ export const useMarkAllNotificationsReadMutation = () => {
   return useMutation({
     mutationFn: () => apiClient("/notifications/read-all", { method: "PATCH" }),
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.list() });
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.notifications.list(),
+      });
       const previous = queryClient.getQueryData<Notification[]>(
         queryKeys.notifications.list(),
       );
@@ -451,17 +466,22 @@ export const useMarkAllNotificationsReadMutation = () => {
       return { previous };
     },
     onError: (_error, _variables, context) => {
-      queryClient.setQueryData(queryKeys.notifications.list(), context?.previous);
+      queryClient.setQueryData(
+        queryKeys.notifications.list(),
+        context?.previous,
+      );
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.list(),
+      });
     },
   });
 };
 
 /**
  * Explicit, user-triggered verification (the verifier dashboard's button).
- * The debounced auto-verify on the verify page uses the query above instead.
+ * The verify page commits a serial into `useVerifyCertificateQuery` instead.
  */
 export const useVerifyCertificateMutation = () => {
   const queryClient = useQueryClient();

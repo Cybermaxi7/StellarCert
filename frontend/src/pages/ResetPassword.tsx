@@ -35,7 +35,12 @@ const ResetPassword = () => {
         newPassword: password,
         confirmPassword: confirm,
       });
-      navigate("/login?message=" + encodeURIComponent("Password reset successful. Please sign in with your new password."));
+      navigate(
+        "/login?message=" +
+          encodeURIComponent(
+            "Password reset successful. Please sign in with your new password.",
+          ),
+      );
     } catch (err: unknown) {
       setError(getErrorMessage(err));
     } finally {
@@ -49,7 +54,10 @@ const ResetPassword = () => {
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-8 w-full max-w-md text-center">
           <h1 className="text-2xl font-bold mb-4">Reset Password</h1>
           <p className="text-red-600 mb-4">Missing or invalid reset token.</p>
-          <a href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <a
+            href="/login"
+            className="text-blue-600 dark:text-blue-400 hover:underline"
+          >
             Request a new reset link
           </a>
         </div>
@@ -64,22 +72,31 @@ const ResetPassword = () => {
         {error && <p className="text-red-600 mb-2">{error}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="reset-password" className="block text-sm mb-1">New Password</label>
+            <label htmlFor="reset-password" className="block text-sm mb-1">
+              New Password
+            </label>
             <input
               id="reset-password"
               type="password"
               value={password}
+              autoComplete="new-password"
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border rounded-md"
               required
             />
           </div>
           <div>
-            <label htmlFor="reset-confirm-password" className="block text-sm mb-1">Confirm Password</label>
+            <label
+              htmlFor="reset-confirm-password"
+              className="block text-sm mb-1"
+            >
+              Confirm Password
+            </label>
             <input
               id="reset-confirm-password"
               type="password"
               value={confirm}
+              autoComplete="new-password"
               onChange={(e) => setConfirm(e.target.value)}
               className="w-full px-3 py-2 border rounded-md"
               required

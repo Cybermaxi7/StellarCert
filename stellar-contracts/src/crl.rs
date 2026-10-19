@@ -11,6 +11,10 @@ const DEFAULT_UPDATE_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
 /// transaction's compute budget.
 const MAX_PAGE_SIZE: u32 = 100;
 
+/// Longest certificate ID accepted into the CRL Merkle tree. Leaves are hashed
+/// from a fixed-size stack buffer, so longer IDs are rejected explicitly.
+const MAX_CERTIFICATE_ID_LEN: usize = 256;
+
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RevocationReason {
@@ -424,7 +428,12 @@ impl CRLContract {
 
     fn append_merkle_leaf(env: &Env, id: &String) -> String {
         let len = id.len() as usize;
-        let mut leaf_data = [0u8; 257];
+        // An over-long ID would otherwise panic on an out-of-bounds slice. Only
+        // this revocation fails; previously recorded revocations are unaffected.
+        if len > MAX_CERTIFICATE_ID_LEN {
+            panic!("Certificate ID exceeds maximum length");
+        }
+        let mut leaf_data = [0u8; MAX_CERTIFICATE_ID_LEN + 1];
         leaf_data[0] = 0;
         id.copy_into_slice(&mut leaf_data[1..len + 1]);
         let leaf_hash: BytesN<32> = env
@@ -462,12 +471,14 @@ impl CRLContract {
 
         let mut root: Option<BytesN<32>> = None;
         let mut index = frontier.len();
-        // Fold larger left-side peaks first; smaller right-side peaks are promoted.
+        // Walk from the highest level down: higher-level peaks cover earlier
+        // leaves, so the accumulated root is always the left operand and each
+        // smaller peak to its right is promoted as the right operand.
         while index > 0 {
             index -= 1;
             if let Some(Some(peak)) = frontier.get(index) {
                 root = Some(match root {
-                    Some(right) => Self::hash_node(env, &peak, &right),
+                    Some(left) => Self::hash_node(env, &left, &peak),
                     None => peak,
                 });
             }

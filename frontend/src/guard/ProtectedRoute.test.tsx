@@ -31,7 +31,7 @@ const LocationProbe = () => {
   return <div data-testid="loc">{loc.pathname + loc.search}</div>;
 };
 
-const renderAt =(path: string, allowedRoles?: UserRole[]) =>
+const renderAt = (path: string, allowedRoles?: UserRole[]) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>

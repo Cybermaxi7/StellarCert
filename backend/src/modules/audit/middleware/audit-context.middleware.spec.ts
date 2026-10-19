@@ -127,8 +127,9 @@ describe('AuditContextMiddleware', () => {
       );
     });
 
-    it('should extract client ip from x-forwarded-for header', () => {
-      // The middleware reads req.headers['x-forwarded-for'] for the client IP
+    it('should ignore x-forwarded-for from an untrusted peer', () => {
+      // Only proxies listed in TRUSTED_PROXY_IPS may set it; the socket peer is used otherwise.
+      delete process.env.TRUSTED_PROXY_IPS;
       mockRequest.headers = {
         'x-forwarded-for': '192.168.1.1, 10.0.0.1',
       };
@@ -148,7 +149,31 @@ describe('AuditContextMiddleware', () => {
       )?.[1];
 
       const context = requestContextService.getContext(contextId);
-      expect(context?.ipAddress).toBe('192.168.1.1');
+      expect(context?.ipAddress).toBe('127.0.0.1');
+    });
+
+    it('should use x-forwarded-for when the peer is a trusted proxy', () => {
+      process.env.TRUSTED_PROXY_IPS = '127.0.0.1';
+      try {
+        mockRequest.headers = {
+          'x-forwarded-for': '6.6.6.6, 192.168.1.1',
+        };
+
+        middleware.use(
+          mockRequest as Request,
+          mockResponse as Response,
+          mockNext,
+        );
+
+        const contextId = (mockResponse.setHeader as jest.Mock).mock.calls.find(
+          (call) => call[0] === 'x-correlation-id',
+        )?.[1];
+        expect(requestContextService.getContext(contextId)?.ipAddress).toBe(
+          '192.168.1.1',
+        );
+      } finally {
+        delete process.env.TRUSTED_PROXY_IPS;
+      }
     });
 
     it('should extract user info from request if available', () => {

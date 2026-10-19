@@ -122,6 +122,6 @@ export class AuditLog {
   })
   timestamp: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

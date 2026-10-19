@@ -99,7 +99,7 @@ export class Certificate {
   @Column({ nullable: true })
   revocationReason?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   revokedAt?: Date;
 
   @Column({ nullable: true })
@@ -153,13 +153,13 @@ export class Certificate {
   @Column({ nullable: true })
   metadataSchemaId?: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   issuedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   expiresAt?: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   @ManyToOne(() => User, { nullable: true })

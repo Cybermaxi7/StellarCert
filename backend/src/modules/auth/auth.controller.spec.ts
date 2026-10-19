@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { TwoFactorService } from './services/two-factor.service';
+import { SessionsService } from './services/sessions.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -23,6 +24,15 @@ describe('AuthController', () => {
         {
           provide: TwoFactorService,
           useValue: {},
+        },
+        {
+          provide: SessionsService,
+          useValue: {
+            createSession: jest.fn(),
+            findByRefreshToken: jest.fn(),
+            rotate: jest.fn(),
+            revokeByRefreshToken: jest.fn(),
+          },
         },
         {
           provide: JwtService,

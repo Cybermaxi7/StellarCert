@@ -1,5 +1,8 @@
 import {
   Controller,
+  Get,
+  Delete,
+  Param,
   Post,
   Body,
   HttpCode,
@@ -23,8 +26,17 @@ import { TwoFactorTokenDto } from './dto/two-factor-token.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { RateLimit } from '../security/decorators/rate-limit.decorator';
+import { SessionsService, SessionMeta } from './services/sessions.service';
+import { getClientIp } from '../../common/utils/client-ip.util';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 const REFRESH_COOKIE = 'refreshToken';
+
+/** Client details recorded on a session, shown on the account security page. */
+const sessionMeta = (req: Request): SessionMeta => ({
+  ipAddress: getClientIp(req),
+  userAgent: req.headers['user-agent'] ?? null,
+});
 const refreshCookieOptions = (isProduction: boolean) => ({
   httpOnly: true,
   secure: isProduction,
@@ -40,6 +52,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private twoFactorService: TwoFactorService,
+    private sessionsService: SessionsService,
   ) {}
 
   @Post('login')
@@ -48,6 +61,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() loginDto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<
     Omit<AuthResponseDto, 'refreshToken'> & {
@@ -62,6 +76,13 @@ export class AuthController {
         result.refreshToken,
         refreshCookieOptions(this.isProduction),
       );
+      if (result.user?.id) {
+        await this.sessionsService.createSession(
+          result.user.id,
+          result.refreshToken,
+          sessionMeta(req),
+        );
+      }
     }
     const { refreshToken: _, ...response } = result;
     return response;
@@ -73,6 +94,7 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async register(
     @Body() registerDto: RegisterDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<Omit<AuthResponseDto, 'refreshToken'>> {
     const result = await this.authService.register(registerDto);
@@ -82,6 +104,13 @@ export class AuthController {
         result.refreshToken,
         refreshCookieOptions(this.isProduction),
       );
+      if (result.user?.id) {
+        await this.sessionsService.createSession(
+          result.user.id,
+          result.refreshToken,
+          sessionMeta(req),
+        );
+      }
     }
     const { refreshToken: _, ...response } = result;
     return response;
@@ -95,6 +124,10 @@ export class AuthController {
     @Body() logoutDto: LogoutDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<LogoutResponseDto> {
+    const refreshToken: string | undefined = req.cookies?.[REFRESH_COOKIE];
+    if (refreshToken) {
+      await this.sessionsService.revokeByRefreshToken(refreshToken);
+    }
     res.clearCookie(REFRESH_COOKIE, { path: '/' });
     // Revoke the bearer token used for this request, not only one in the body.
     const bearer = req.headers?.authorization?.split(' ')[1];
@@ -116,7 +149,21 @@ export class AuthController {
     if (!refreshToken) {
       throw new UnauthorizedException('No refresh token');
     }
+    // A session revoked from the account security page must not be revived.
+    const session = await this.sessionsService.findByRefreshToken(refreshToken);
+    if (session?.revokedAt) {
+      res.clearCookie(REFRESH_COOKIE, { path: '/' });
+      throw new UnauthorizedException('Session has been revoked');
+    }
     const result = await this.authService.refreshTokens(refreshToken);
+    if (result.user?.id && result.refreshToken) {
+      await this.sessionsService.rotate(
+        result.user.id,
+        refreshToken,
+        result.refreshToken,
+        sessionMeta(req),
+      );
+    }
     res.cookie(
       REFRESH_COOKIE,
       result.refreshToken,
@@ -158,6 +205,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verify2fa(
     @Body() dto: TwoFactorVerifyDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<Omit<AuthResponseDto, 'refreshToken'>> {
     const result = await this.authService.verifyTwoFactor(
@@ -170,6 +218,13 @@ export class AuthController {
         result.refreshToken,
         refreshCookieOptions(this.isProduction),
       );
+      if (result.user?.id) {
+        await this.sessionsService.createSession(
+          result.user.id,
+          result.refreshToken,
+          sessionMeta(req),
+        );
+      }
     }
     const { refreshToken: _, ...response } = result;
     return response;
@@ -183,5 +238,36 @@ export class AuthController {
     @Body() dto: TwoFactorTokenDto,
   ): Promise<{ backupCodes: string[] }> {
     return this.twoFactorService.regenerateBackupCodes(req.user.id, dto.token);
+  }
+
+  /** #1184 — list active sessions for the current user */
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  async listSessions(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const currentRefresh = req.cookies?.[REFRESH_COOKIE] as string | undefined;
+    return this.sessionsService.listForUser(userId, currentRefresh);
+  }
+
+  /** #1184 — revoke a single session */
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async revokeSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+  ) {
+    await this.sessionsService.revokeSession(userId, sessionId);
+  }
+
+  /** #1184 — sign out everywhere (all sessions + bump tokenVersion) */
+  @Delete('sessions')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async revokeAllSessions(@CurrentUser('id') userId: string) {
+    const count = await this.sessionsService.revokeAll(userId);
+    return { revoked: count };
   }
 }

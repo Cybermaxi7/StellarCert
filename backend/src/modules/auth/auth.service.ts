@@ -74,7 +74,7 @@ export class AuthService {
       return { requires2FA: true, preAuthToken } as any;
     }
 
-    const payload = { email: user.email, sub: user.id, role: user.role };
+    const payload = { email: user.email, sub: user.id, role: user.role, ver: user.tokenVersion ?? 0 };
     const accessToken =
       await this.jwtManagementService.generateAccessToken(payload);
     const refreshToken =
@@ -244,6 +244,12 @@ export class AuthService {
       const user = await this.usersService.findOneById(payload.sub);
       if (!user || !user.isActive) {
         throw new UnauthorizedException('User not found or inactive');
+      }
+
+      // "Sign out everywhere" bumps tokenVersion; refresh tokens minted before
+      // that carry the older `ver` and must not mint new access tokens (#1184).
+      if ((payload.ver ?? 0) < (user.tokenVersion ?? 0)) {
+        throw new UnauthorizedException('Refresh token has been revoked');
       }
 
       // Verify that the refresh token in the DB matches the one provided

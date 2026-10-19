@@ -79,6 +79,10 @@ describe("App route error handling (#744)", () => {
     renderAt("/verify");
 
     // Should now show the Verify page content instead of error
-    expect(await screen.findByText("Verify Certificate")).toBeInTheDocument();
+    // The Verify page is a large lazy chunk; give it longer than the 1s default
+    // so the test does not flake when the suite runs in parallel.
+    expect(
+      await screen.findByText("Verify Certificate", {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 });

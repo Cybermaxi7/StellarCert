@@ -13,6 +13,7 @@ import { AuditAction, AuditResourceType } from '../constants';
 @Index(['resourceType'])
 // @Index(['resourceId']) // Keep commented for now
 @Index(['createdAt'])
+@Index(['timestamp'])
 @Index(['correlationId'])
 @Index(['ipAddress'])
 @Index(['status'])

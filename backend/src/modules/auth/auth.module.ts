@@ -14,6 +14,8 @@ import { JwtManagementService } from './services/jwt.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { UsersModule } from '../users/users.module';
 import { User } from '../users/entities/user.entity';
+import { AuthSession } from './entities/auth-session.entity';
+import { SessionsService } from './services/sessions.service';
 import { CacheModule } from '@nestjs/cache-manager';
 import { AuthRateLimitMiddleware } from './middleware/auth-rate-limit.middleware';
 
@@ -21,7 +23,7 @@ import { AuthRateLimitMiddleware } from './middleware/auth-rate-limit.middleware
   imports: [
     CacheModule.register(),
     ConfigModule,
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, AuthSession]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -49,9 +51,10 @@ import { AuthRateLimitMiddleware } from './middleware/auth-rate-limit.middleware
     AuthService,
     JwtManagementService,
     TwoFactorService,
+    SessionsService,
     AuthRateLimitMiddleware,
   ],
-  exports: [AuthService, JwtModule, JwtManagementService, TwoFactorService],
+  exports: [AuthService, JwtModule, JwtManagementService, TwoFactorService, SessionsService],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

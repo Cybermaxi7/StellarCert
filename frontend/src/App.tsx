@@ -27,6 +27,7 @@ const NotificationPreferences = lazy(
   () => import("./pages/NotificationPreferences"),
 );
 const NotFound = lazy(() => import("./pages/NotFound"));
+const AccountSecurity = lazy(() => import("./pages/AccountSecurity"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 
 // Loading fallback component
@@ -116,6 +117,7 @@ function App() {
                       path="/preferences"
                       element={<NotificationPreferences />}
                     />
+                    <Route path="/security" element={<AccountSecurity />} />
                   </Route>
 
                   {/* Catch-all: must be last */}

@@ -26,28 +26,44 @@ export interface AuthenticatedUser {
   sub: string;
   email: string;
   role: string;
+  /** `ver` claim of the access token; see {@link User.tokenVersion}. */
+  tokenVersion?: number;
 }
 
 interface RequestWithUser extends Request {
   user: AuthenticatedUser;
 }
 
-/** How long a user's active/inactive lookup is reused, in ms. */
+interface AccessTokenPayload {
+  sub: string;
+  email: string;
+  role: string;
+  ver?: number;
+}
+
+interface CachedUserState {
+  active: boolean;
+  tokenVersion: number;
+  expiresAt: number;
+}
+
+/**
+ * How long a user's state lookup is reused, in ms. This bounds how long a
+ * suspended account, or a token revoked by "sign out everywhere", keeps working.
+ */
 const USER_STATUS_CACHE_MS = 30_000;
 const USER_STATUS_CACHE_MAX = 10_000;
 
 /**
  * JWT Authentication Guard
  * Validates JWT tokens from the Authorization header, rejects tokens that were
- * blacklisted on logout, and rejects users that are missing, deactivated or
- * suspended (#1118).
+ * blacklisted on logout, rejects users that are missing, deactivated or
+ * suspended (#1118), and rejects tokens minted before the user's last
+ * "sign out everywhere" (#1184).
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  private readonly userStatusCache = new Map<
-    string,
-    { active: boolean; expiresAt: number }
-  >();
+  private readonly userStateCache = new Map<string, CachedUserState>();
 
   constructor(
     private jwtService: JwtService,
@@ -78,7 +94,7 @@ export class JwtAuthGuard implements CanActivate {
       );
     }
 
-    let payload: { sub: string; email: string; role: string };
+    let payload: AccessTokenPayload;
     try {
       const secret = this.configService.get<string>('JWT_ACCESS_SECRET');
 
@@ -106,8 +122,17 @@ export class JwtAuthGuard implements CanActivate {
       );
     }
 
-    if (!(await this.isUserActive(payload.sub))) {
+    const state = await this.loadUserState(payload.sub);
+    if (state && !state.active) {
       throw new AuthException(ErrorCode.UNAUTHORIZED, 'User is not active');
+    }
+
+    const tokenVersion = payload.ver ?? 0;
+    if (state && tokenVersion < state.tokenVersion) {
+      throw new AuthException(
+        ErrorCode.TOKEN_INVALID,
+        'Token has been revoked',
+      );
     }
 
     // Single canonical req.user shape: id and sub are aliases of the same
@@ -117,6 +142,7 @@ export class JwtAuthGuard implements CanActivate {
       sub: payload.sub,
       email: payload.email,
       role: payload.role,
+      tokenVersion,
     };
 
     return true;
@@ -138,33 +164,42 @@ export class JwtAuthGuard implements CanActivate {
       : false;
   }
 
-  /** Reload the user so deleted or suspended accounts lose access at once. */
-  private async isUserActive(userId: string): Promise<boolean> {
+  /**
+   * Reload the user so deleted or suspended accounts, and revoked token
+   * versions, lose access promptly. Returns undefined when no database is
+   * available (isolated tests), in which case only the signature is checked.
+   */
+  private async loadUserState(
+    userId: string,
+  ): Promise<CachedUserState | undefined> {
     if (!this.dataSource) {
-      return true;
+      return undefined;
     }
 
     const now = Date.now();
-    const cached = this.userStatusCache.get(userId);
+    const cached = this.userStateCache.get(userId);
     if (cached && cached.expiresAt > now) {
-      return cached.active;
+      return cached;
     }
 
     const user = await this.dataSource.getRepository(User).findOne({
       where: { id: userId },
-      select: { id: true, isActive: true, status: true },
+      select: { id: true, isActive: true, status: true, tokenVersion: true },
     });
-    const active =
-      !!user && user.isActive !== false && user.status !== UserStatus.SUSPENDED;
-
-    if (this.userStatusCache.size >= USER_STATUS_CACHE_MAX) {
-      this.userStatusCache.clear();
-    }
-    this.userStatusCache.set(userId, {
-      active,
+    const state: CachedUserState = {
+      active:
+        !!user &&
+        user.isActive !== false &&
+        user.status !== UserStatus.SUSPENDED,
+      tokenVersion: user?.tokenVersion ?? 0,
       expiresAt: now + USER_STATUS_CACHE_MS,
-    });
-    return active;
+    };
+
+    if (this.userStateCache.size >= USER_STATUS_CACHE_MAX) {
+      this.userStateCache.clear();
+    }
+    this.userStateCache.set(userId, state);
+    return state;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {

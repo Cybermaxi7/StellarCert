@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
-import { Menu, User, X, Users } from 'lucide-react';
+import { Menu, User, X, Users, ShieldCheck } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../api/types';
@@ -59,6 +59,11 @@ export default function Header(): JSX.Element {
             label: 'Profile',
             to: '/profile',
             icon: <User className="h-4 w-4" />,
+          },
+          {
+            label: 'Security',
+            to: '/security',
+            icon: <ShieldCheck className="h-4 w-4" />,
           },
         ] as NavItem[])
       : []),

@@ -400,6 +400,34 @@ export class CertificateService {
     return certificate;
   }
 
+
+  /**
+   * Lookup by serial number scoped to the caller's own certificates (#1146).
+   * Admins may look up any serial.
+   */
+  async findBySerialNumber(
+    serialNumber: string,
+    requesterId: string,
+    requesterRole: string,
+  ): Promise<Certificate> {
+    const certificate = await this.certificateRepository.findOne({
+      where: { certificateId: serialNumber },
+      relations: ['issuer'],
+    });
+    if (!certificate) {
+      throw new NotFoundException(
+        `Certificate with serial "${serialNumber}" not found`,
+      );
+    }
+    const isAdmin = requesterRole === 'admin' || requesterRole === 'ADMIN';
+    if (!isAdmin && certificate.issuerId !== requesterId) {
+      throw new NotFoundException(
+        `Certificate with serial "${serialNumber}" not found`,
+      );
+    }
+    return certificate;
+  }
+
   async findByVerificationCode(verificationCode: string): Promise<Certificate> {
     const certificate = await this.certificateRepository
       .createQueryBuilder('certificate')
@@ -723,7 +751,7 @@ export class CertificateService {
     if (filters) {
       if (filters.search) {
         queryBuilder.andWhere(
-          '(certificate.serialNumber ILIKE :search OR certificate.recipientName ILIKE :search OR certificate.recipientEmail ILIKE :search OR certificate.title ILIKE :search)',
+          '(certificate.certificateId ILIKE :search OR certificate.recipientName ILIKE :search OR certificate.recipientEmail ILIKE :search OR certificate.title ILIKE :search)',
           { search: `%${filters.search}%` },
         );
       }
@@ -790,7 +818,7 @@ export class CertificateService {
     if (filters) {
       if (filters.search) {
         queryBuilder.andWhere(
-          '(certificate.serialNumber ILIKE :search OR certificate.recipientName ILIKE :search OR certificate.recipientEmail ILIKE :search OR certificate.title ILIKE :search)',
+          '(certificate.certificateId ILIKE :search OR certificate.recipientName ILIKE :search OR certificate.recipientEmail ILIKE :search OR certificate.title ILIKE :search)',
           { search: `%${filters.search}%` },
         );
       }
@@ -946,7 +974,7 @@ export class CertificateService {
             .orWhere('certificate.recipientEmail ILIKE :search', {
               search: `%${escaped}%`,
             })
-            .orWhere('certificate.serialNumber ILIKE :search', {
+            .orWhere('certificate.certificateId ILIKE :search', {
               search: `%${escaped}%`,
             });
         }),

@@ -44,7 +44,8 @@ export const typeOrmConfig: TypeOrmModuleOptions = {
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
   autoLoadEntities: true,
-  migrations: [__dirname + '/../migrations/*{.ts,.js}'],
+  // Same location the CLI DataSource uses (src/database/data-source.ts).
+  migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
   migrationsRun: true,
 };
 

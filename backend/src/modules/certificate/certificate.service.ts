@@ -18,6 +18,7 @@ import { RevokeCertificateDto } from './dto/revoke-certificate.dto';
 import { SearchCertificatesDto } from './dto/search-certificates.dto';
 import { Certificate } from './entities/certificate.entity';
 import { Verification } from './entities/verification.entity';
+import { Issuer } from '../issuers/entities/issuer.entity';
 import { CertificateStatus } from './constants/certificate-status.enum';
 import { User } from '../users/entities/user.entity';
 import { DuplicateDetectionService } from './services/duplicate-detection.service';
@@ -139,6 +140,17 @@ export class CertificateService {
         savedCertificate.isDuplicate = true;
         savedCertificate.overrideReason = overrideReason;
         await queryRunner.manager.save(savedCertificate);
+      }
+
+      // Keep the issuer's counter in step with what was just saved. It runs in the
+      // same transaction, so a rolled-back issuance never leaves a stale count.
+      if (savedCertificate.issuerId ?? dto.issuerId) {
+        await queryRunner.manager.increment(
+          Issuer,
+          { id: savedCertificate.issuerId ?? dto.issuerId },
+          'certificateCount',
+          1,
+        );
       }
 
       // Commit the transaction

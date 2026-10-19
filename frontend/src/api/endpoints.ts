@@ -68,12 +68,15 @@ const handleError = (error: unknown, endpointName: string): never => {
   throw new ApiError(message, statusCode, errorName);
 };
 
-// Base path constants for authentication
+// Base path constants for authentication. All auth now lives under /auth/*
+// (issue #1195): the /users login/register/logout/refresh duplicates were
+// removed from the backend, so these point at the single AuthService-backed
+// surface — which the httpOnly-cookie refresh flow already expected.
 export const AUTH_ENDPOINTS = {
-  LOGIN: "/users/login",
-  REGISTER: "/users/register",
-  REFRESH: "/users/refresh-token",
-  LOGOUT: "/users/logout",
+  LOGIN: "/auth/login",
+  REGISTER: "/auth/register",
+  REFRESH: "/auth/refresh",
+  LOGOUT: "/auth/logout",
 } as const;
 
 /**

@@ -179,4 +179,3 @@ describe('AuthRateLimitMiddleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 });
-

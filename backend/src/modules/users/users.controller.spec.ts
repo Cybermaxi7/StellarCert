@@ -5,8 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User, UserRole, UserStatus } from './entities/user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
-import { LoginUserDto } from './dto/login-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserFilterDto } from './dto/pagination.dto';
@@ -131,7 +129,7 @@ describe('UsersController', () => {
   describe('Public route metadata', () => {
     const reflector = new Reflector();
 
-    it.each(['register', 'login'])(
+    it.each(['verifyEmail', 'forgotPassword'])(
       'should mark %s as public so the global JwtAuthGuard allows anonymous access',
       (methodName) => {
         const handler = (
@@ -144,75 +142,17 @@ describe('UsersController', () => {
     );
   });
 
-  describe('Authentication Endpoints', () => {
-    describe('register', () => {
-      it('should register a new user', async () => {
-        const createUserDto: CreateUserDto = {
-          email: 'newuser@example.com',
-          password: 'SecureP@ss123',
-          firstName: 'Jane',
-          lastName: 'Doe',
-        };
-
-        const expectedResult = {
-          user: mockUser,
-          tokens: mockTokens,
-        };
-
-        mockUsersService.register.mockResolvedValue(expectedResult);
-
-        const result = await controller.register(createUserDto);
-
-        expect(result).toEqual(expectedResult);
-        expect(usersService.register).toHaveBeenCalledWith(createUserDto);
-      });
-    });
-
-    describe('login', () => {
-      it('should login a user', async () => {
-        const loginDto: LoginUserDto = {
-          email: 'test@example.com',
-          password: 'SecureP@ss123',
-        };
-
-        const expectedResult = {
-          user: mockUser,
-          tokens: mockTokens,
-        };
-
-        mockUsersService.login.mockResolvedValue(expectedResult);
-
-        const result = await controller.login(loginDto);
-
-        expect(result).toEqual(expectedResult);
-        expect(usersService.login).toHaveBeenCalledWith(loginDto);
-      });
-    });
-
-    describe('logout', () => {
-      it('should logout a user', async () => {
-        mockUsersService.logout.mockResolvedValue(undefined);
-
-        const result = await controller.logout(mockUser.id!);
-
-        expect(result).toEqual({ message: 'Logged out successfully' });
-        expect(usersService.logout).toHaveBeenCalledWith(mockUser.id);
-      });
-    });
-
-    describe('refreshToken', () => {
-      it('should refresh tokens', async () => {
-        const refreshTokenDto = { refreshToken: 'valid-refresh-token' };
-
-        mockUsersService.refreshTokens.mockResolvedValue(mockTokens);
-
-        const result = await controller.refreshToken(refreshTokenDto);
-
-        expect(result).toEqual(mockTokens);
-        expect(usersService.refreshTokens).toHaveBeenCalledWith(
-          refreshTokenDto,
-        );
-      });
+  describe('Authentication endpoints were removed (#1195)', () => {
+    it('no longer exposes register/login/logout/refresh-token on /users', () => {
+      const prototype = UsersController.prototype as unknown as Record<
+        string,
+        unknown
+      >;
+      // Authentication lives exclusively under /auth/* (AuthService);
+      // duplicate /users entry points were deleted with the consolidation.
+      for (const removed of ['register', 'login', 'logout', 'refreshToken']) {
+        expect(prototype[removed]).toBeUndefined();
+      }
     });
   });
 

@@ -70,56 +70,58 @@ describe('UsersController (e2e)', () => {
   });
 
   describe('Authentication', () => {
-    describe('POST /users/register', () => {
+    // The register/login/logout/refresh-token endpoints under /users were
+    // removed by the auth consolidation (issue #1195). These seeds hit the
+    // single /auth/* surface, backed by AuthService, that auth.e2e-spec.ts
+    // covers in depth.
+    describe('POST /auth/register (seeded via consolidated surface)', () => {
       it('should register a new user', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/register')
+          .post('/api/v1/auth/register')
           .send(testUser)
           .expect(201)
           .expect((res) => {
             expect(res.body.data).toHaveProperty('user');
-            expect(res.body.data).toHaveProperty('tokens');
             expect(res.body.data.user.email).toBe(testUser.email);
-            expect(res.body.data.tokens).toHaveProperty('accessToken');
-            expect(res.body.data.tokens).toHaveProperty('refreshToken');
-            accessToken = res.body.data.tokens.accessToken;
+            expect(res.body.data).toHaveProperty('accessToken');
+            accessToken = res.body.data.accessToken;
             testUserId = res.body.data.user.id;
           });
       });
 
       it('should fail with duplicate email', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/register')
+          .post('/api/v1/auth/register')
           .send(testUser)
           .expect(409);
       });
 
       it('should fail with invalid email', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/register')
+          .post('/api/v1/auth/register')
           .send({ ...testUser, email: 'invalid-email' })
           .expect(400);
       });
 
       it('should fail with weak password', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/register')
+          .post('/api/v1/auth/register')
           .send({ ...testUser, email: 'new@example.com', password: 'weak' })
           .expect(400);
       });
 
       it('should fail with missing required fields', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/register')
+          .post('/api/v1/auth/register')
           .send({ email: 'test@example.com' })
           .expect(400);
       });
     });
 
-    describe('POST /users/login', () => {
+    describe('POST /auth/login (seeded via consolidated surface)', () => {
       it('should login successfully', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/login')
+          .post('/api/v1/auth/login')
           .send({
             email: testUser.email,
             password: testUser.password,
@@ -127,14 +129,14 @@ describe('UsersController (e2e)', () => {
           .expect(200)
           .expect((res) => {
             expect(res.body.data).toHaveProperty('user');
-            expect(res.body.data).toHaveProperty('tokens');
-            accessToken = res.body.data.tokens.accessToken;
+            expect(res.body.data).toHaveProperty('accessToken');
+            accessToken = res.body.data.accessToken;
           });
       });
 
       it('should fail with invalid credentials', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/login')
+          .post('/api/v1/auth/login')
           .send({
             email: testUser.email,
             password: 'WrongP@ss123',
@@ -144,62 +146,11 @@ describe('UsersController (e2e)', () => {
 
       it('should fail with non-existent email', () => {
         return request(app.getHttpServer())
-          .post('/api/v1/users/login')
+          .post('/api/v1/auth/login')
           .send({
             email: 'nonexistent@example.com',
             password: 'SomeP@ss123',
           })
-          .expect(401);
-      });
-    });
-
-    describe('POST /users/logout', () => {
-      it('should logout successfully', () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/users/logout')
-          .set('Authorization', `Bearer ${accessToken}`)
-          .expect(200)
-          .expect((res) => {
-            expect(res.body.data.message).toBe('Logged out successfully');
-          });
-      });
-
-      it('should fail without authentication', () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/users/logout')
-          .expect(401);
-      });
-    });
-
-    describe('POST /users/refresh-token', () => {
-      let refreshToken: string;
-
-      beforeAll(async () => {
-        const res = await request(app.getHttpServer())
-          .post('/api/v1/users/login')
-          .send({
-            email: testUser.email,
-            password: testUser.password,
-          });
-        refreshToken = res.body.data.tokens.refreshToken;
-        accessToken = res.body.data.tokens.accessToken;
-      });
-
-      it('should refresh tokens successfully', () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/users/refresh-token')
-          .send({ refreshToken })
-          .expect(200)
-          .expect((res) => {
-            expect(res.body.data).toHaveProperty('accessToken');
-            expect(res.body.data).toHaveProperty('refreshToken');
-          });
-      });
-
-      it('should fail with invalid refresh token', () => {
-        return request(app.getHttpServer())
-          .post('/api/v1/users/refresh-token')
-          .send({ refreshToken: 'invalid-token' })
           .expect(401);
       });
     });
@@ -379,8 +330,9 @@ describe('UsersController (e2e)', () => {
     beforeAll(async () => {
       // Register admin user
       const registerRes = await request(app.getHttpServer())
-        .post('/api/v1/users/register')
-        .send(adminUser);
+        .post('/api/v1/auth/register')
+        .send(adminUser)
+        .expect(201);
 
       adminUserId = registerRes.body.data.user.id;
 
@@ -395,10 +347,10 @@ describe('UsersController (e2e)', () => {
         .update({ id: adminUserId }, { role: UserRole.ADMIN });
 
       const loginRes = await request(app.getHttpServer())
-        .post('/api/v1/users/login')
+        .post('/api/v1/auth/login')
         .send({ email: adminUser.email, password: adminUser.password })
         .expect(200);
-      adminAccessToken = loginRes.body.data.tokens.accessToken;
+      adminAccessToken = loginRes.body.data.accessToken;
     });
 
     describe('GET /users', () => {

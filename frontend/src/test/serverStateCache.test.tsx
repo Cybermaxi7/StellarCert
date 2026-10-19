@@ -18,6 +18,7 @@ import type { Mock } from "vitest";
 vi.mock("../api/endpoints", () => ({
   certificateApi: {
     getQR: vi.fn().mockResolvedValue("data:image/png;base64,MOCK"),
+    transfer: { getPending: vi.fn().mockResolvedValue([]) },
   },
   getUserCertificates: vi.fn(),
   getCertificatePdfUrl: vi
@@ -26,7 +27,9 @@ vi.mock("../api/endpoints", () => ({
 }));
 
 const { walletAuth } = vi.hoisted(() => ({
-  walletAuth: { user: { id: "u1" } as { id: string } },
+  // An issuer is served by GET /certificates/user/:id, the query this file
+  // exercises; recipients use GET /certificates/me (keyed by user as well).
+  walletAuth: { user: { id: "u1", role: "issuer" } as { id: string; role?: string } },
 }));
 
 vi.mock("../context/AuthContext", () => ({
@@ -58,7 +61,7 @@ describe("server-state cache (#959)", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    walletAuth.user = { id: "u1" };
+    walletAuth.user = { id: "u1", role: "issuer" };
   });
 
   it("de-duplicates identical concurrent requests from sibling components", async () => {

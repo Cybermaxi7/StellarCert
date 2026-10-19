@@ -194,7 +194,7 @@ export default function AdminAuditLogs() {
               <option value="">All actions</option>
               {actions.map((action) => (
                 <option key={action} value={action}>
-                  {action.replaceAll('_', ' ')}
+                  {action.replace(/_/g, ' ')}
                 </option>
               ))}
             </select>
@@ -320,7 +320,7 @@ export default function AdminAuditLogs() {
                           {log.userEmail || log.userId || 'System'}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900 dark:text-white">
-                          {log.action.replaceAll('_', ' ')}
+                          {log.action.replace(/_/g, ' ')}
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-slate-300">
                           {log.resourceType || '—'}

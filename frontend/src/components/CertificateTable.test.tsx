@@ -409,8 +409,9 @@ describe('CertificateTable pagination on empty results (#999)', () => {
 
     await waitFor(() => expect(certificateApi.list).toHaveBeenCalled());
 
+    // list() resolving is not the same as the table having rendered it.
+    expect(await screen.findByText('No certificates found')).toBeInTheDocument();
     expect(screen.getByText('0 results')).toBeInTheDocument();
-    expect(screen.getByText('No certificates found')).toBeInTheDocument();
 
     const prevButton = screen.getByRole('button', { name: /previous page/i });
     const nextButton = screen.getByRole('button', { name: /next page/i });

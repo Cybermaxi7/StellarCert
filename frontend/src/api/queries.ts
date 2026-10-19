@@ -55,7 +55,9 @@ export const queryKeys = {
   certificates: {
     root: ["certificates"] as const,
     list: (params: unknown) => ["certificates", "list", params] as const,
-    me: () => ["certificates", "me"] as const,
+    // Keyed by user so a logout/login in the same tab never serves the
+    // previous user's certificates from cache.
+    me: (userId: string) => ["certificates", "me", userId] as const,
     user: (userId: string) => ["certificates", "user", userId] as const,
     verification: (serialNumber: string) =>
       ["certificates", "verify", serialNumber] as const,
@@ -118,11 +120,11 @@ export const useSessionQuery = (enabled: boolean) =>
  * Certificates held by the currently authenticated recipient user.
  * Queries GET /certificates/me to prevent IDOR vulnerability.
  */
-export const useMyCertificatesQuery = (enabled = true) =>
+export const useMyCertificatesQuery = (userId: string | undefined) =>
   useQuery({
-    queryKey: queryKeys.certificates.me(),
+    queryKey: queryKeys.certificates.me(userId ?? ""),
     queryFn: () => getMyCertificates(),
-    enabled,
+    enabled: !!userId,
   });
 
 /**

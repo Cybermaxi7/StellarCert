@@ -49,7 +49,7 @@ const CertificateWallet = () => {
   // For recipient/user accounts, securely fetch certificates via GET /certificates/me (IDOR-safe).
   // For admin/issuer testing or inspecting, fallback to useUserCertificatesQuery.
   const isRecipientUser = !user?.role || user.role === UserRole.RECIPIENT || user.role === UserRole.USER;
-  const myCertsQuery = useMyCertificatesQuery(!!user && isRecipientUser);
+  const myCertsQuery = useMyCertificatesQuery(isRecipientUser ? user?.id : undefined);
   const userCertsQuery = useUserCertificatesQuery(!isRecipientUser ? user?.id : undefined);
 
   const certificates = isRecipientUser ? (myCertsQuery.data ?? []) : (userCertsQuery.data ?? []);
@@ -604,7 +604,7 @@ const CertificateWallet = () => {
                   Open verification page
                 </a>
 
-                {navigator.share && (
+                {typeof navigator.share === 'function' && (
                   <button
                     onClick={() => handleShare(sharingCert)}
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400"

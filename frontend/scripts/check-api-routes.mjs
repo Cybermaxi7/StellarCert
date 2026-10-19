@@ -61,15 +61,16 @@ for (const file of controllerFiles) {
   let match;
   while ((match = methodRegex.exec(content)) !== null) {
     const subPath = match[2] ?? match[3] ?? '';
-    const full =
-      '/' +
-      [basePrefix, subPath]
-        .filter(Boolean)
-        .join('/')
-        .replace(/\/+/g, '/')
-        .replace(/^\/+/, '')
-        .replace(/\/+$/, '');
-    const normalized = full ? '/' + full : '/';
+    // Join without a leading slash, then add exactly one. (Prefixing '/' to a
+    // path that already started with one produced '//auth/login', which
+    // matched nothing.)
+    const joined = [basePrefix, subPath]
+      .filter(Boolean)
+      .join('/')
+      .replace(/\/+/g, '/')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '');
+    const normalized = '/' + joined;
 
     // Convert :param and wildcard patterns into regex
     const regexPattern = new RegExp(
@@ -104,6 +105,9 @@ while ((fMatch = apiCallRegex.exec(endpointsContent)) !== null) {
 
   // Normalize template interpolations like ${id} or ${certificateId} to a placeholder
   raw = raw.replace(/\$\{[^}]+\}/g, 'PLACEHOLDER');
+  // A nested template literal (`${cond ? `?a=${x}` : ''}`) is cut short by the
+  // regex above, leaving an unterminated "${"; whatever follows is a query.
+  raw = raw.replace(/\$\{.*$/, '');
 
   if (raw.startsWith('/')) {
     frontendRoutes.add(raw);

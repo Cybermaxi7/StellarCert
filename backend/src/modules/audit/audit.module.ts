@@ -5,7 +5,6 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
 import { AuditLog } from './entities';
 import { AuditService, RequestContextService } from './services';
 import { AuditController } from './controllers';
@@ -16,7 +15,6 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([AuditLog]),
-    ScheduleModule.forRoot(),
     forwardRef(() => AuthModule),
   ],
   controllers: [AuditController],

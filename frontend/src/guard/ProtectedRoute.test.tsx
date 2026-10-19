@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ProtectedRoute from './ProtectedRoute';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +26,12 @@ const setUser = (user: User | null) =>
     login: vi.fn(),
   });
 
-const renderAt = (path: string, allowedRoles?: UserRole[]) =>
+const LocationProbe = () => {
+  const loc = useLocation();
+  return <div data-testid="loc">{loc.pathname + loc.search}</div>;
+};
+
+const renderAt =(path: string, allowedRoles?: UserRole[]) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -81,6 +86,23 @@ describe('ProtectedRoute prefix matching (#565)', () => {
     setUser(null);
     renderAt('/certificates/abc-123');
     expect(screen.getByText('login')).toBeTruthy();
+  });
+
+  it('preserves the original path and query as returnUrl when redirecting to login', () => {
+    setUser(null);
+    render(
+      <MemoryRouter initialEntries={['/certificates/abc-123?tab=files']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/certificates/:id" element={<div>cert detail</div>} />
+          </Route>
+          <Route path="/login" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('loc').textContent).toBe(
+      `/login?returnUrl=${encodeURIComponent('/certificates/abc-123?tab=files')}`,
+    );
   });
 
   it('honours explicit allowedRoles (role mismatch redirects home)', () => {

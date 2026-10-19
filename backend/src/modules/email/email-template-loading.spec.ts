@@ -1,6 +1,20 @@
-import * as fs from 'fs';
 import { ConfigService } from '@nestjs/config';
 import { EmailService } from './email.service';
+
+// `fs` exports are non-configurable, so `jest.spyOn(fs, 'readFileSync')` throws
+// "Cannot redefine property". Mock the module instead, delegating to the real
+// implementation unless a test asks reads to fail.
+const mockFs = { failReads: false };
+jest.mock('fs', () => {
+  const actual = jest.requireActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    readFileSync: jest.fn((...args: Parameters<typeof actual.readFileSync>) => {
+      if (mockFs.failReads) throw new Error('ENOENT');
+      return actual.readFileSync(...args);
+    }),
+  };
+});
 
 function build(nodeEnv: string) {
   const config = {
@@ -11,18 +25,21 @@ function build(nodeEnv: string) {
 }
 
 describe('EmailService template loading', () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    mockFs.failReads = false;
+  });
 
   it('loads all six templates from the source tree', () => {
     const { create } = build('test');
     const service = create();
-    expect((service as unknown as { templates: Map<string, unknown> }).templates.size).toBe(6);
+    expect(
+      (service as unknown as { templates: Map<string, unknown> }).templates
+        .size,
+    ).toBe(6);
   });
 
   it('logs and carries on outside production when a template is missing', () => {
-    jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
-      throw new Error('ENOENT');
-    });
+    mockFs.failReads = true;
     const { create, logger } = build('development');
 
     expect(() => create()).not.toThrow();
@@ -30,9 +47,7 @@ describe('EmailService template loading', () => {
   });
 
   it('fails startup in production when a template cannot be loaded', () => {
-    jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
-      throw new Error('ENOENT');
-    });
+    mockFs.failReads = true;
     const { create } = build('production');
 
     expect(() => create()).toThrow(/Email templates could not be loaded/);

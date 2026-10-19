@@ -63,7 +63,8 @@ export class InMemoryRateLimitStore implements RateLimitStore {
 
     entry.count += 1;
     this.entries.set(key, entry);
-    return entry;
+    // Return a snapshot: callers must not see (or mutate) the live counter.
+    return { ...entry };
   }
 
   async reset(key: string): Promise<void> {

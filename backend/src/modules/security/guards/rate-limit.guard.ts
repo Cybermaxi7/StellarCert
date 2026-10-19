@@ -16,8 +16,8 @@ import { RateLimitService } from '../../../common/rate-limiting/rate-limit.servi
 import {
   InMemoryRateLimitStore,
   RATE_LIMIT_STORE,
-  RateLimitStore,
 } from '../../../common/guards/ip-rate-limit.guard';
+import type { RateLimitStore } from '../../../common/guards/ip-rate-limit.guard';
 import {
   parseTrustedProxyIps,
   resolveClientIp,

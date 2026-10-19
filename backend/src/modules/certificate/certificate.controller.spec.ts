@@ -128,7 +128,7 @@ describe('CertificateController', () => {
     certificateService.verifyByCode.mockResolvedValue(mockCertificate);
     certificateMapper.toVerificationResult.mockReturnValue(expectedResponse);
 
-    const req = { ip: '127.0.0.1', headers: {} };
+    const req = { ip: '127.0.0.1', socket: { remoteAddress: '127.0.0.1' }, headers: {} };
     await expect(
       (controller as any).verifyByCode('AB12CD34', req, 'public'),
     ).resolves.toEqual(expectedResponse);
@@ -388,7 +388,7 @@ describe('CertificateController', () => {
     });
 
     it('forwards the issuer identity and role when revoking', async () => {
-      const req = { ip: '127.0.0.1', headers: {} };
+      const req = { ip: '127.0.0.1', socket: { remoteAddress: '127.0.0.1' }, headers: {} };
 
       await controller.revoke(
         CERT_ID,

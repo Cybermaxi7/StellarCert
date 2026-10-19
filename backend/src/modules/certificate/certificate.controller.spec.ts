@@ -441,7 +441,7 @@ describe('CertificateController', () => {
   });
 
   describe('getMyCertificates', () => {
-    it('queries certificates by recipientId and verified email when email is verified', async () => {
+    it('delegates to findForRecipient with the caller id and paging', async () => {
       const mockCerts = [{ id: 'cert-1', recipientEmail: 'alice@example.com' }];
       certificateService.findForRecipient.mockResolvedValueOnce(mockCerts);
 
@@ -449,38 +449,16 @@ describe('CertificateController', () => {
         id: 'user-123',
         email: 'alice@example.com',
         role: UserRole.RECIPIENT,
-        isEmailVerified: true,
-      };
-
-      const result = await controller.getMyCertificates(user as any, 1, 10);
-
-      expect(certificateService.findForRecipient).toHaveBeenCalledWith(
-        'user-123',
-        1,
-        10,
-        'alice@example.com',
-      );
-      expect(result).toEqual(mockCerts);
-    });
-
-    it('omits email fallback if user isEmailVerified is explicitly false', async () => {
-      const mockCerts = [{ id: 'cert-1', recipientId: 'user-123' }];
-      certificateService.findForRecipient.mockResolvedValueOnce(mockCerts);
-
-      const user = {
-        id: 'user-123',
-        email: 'unverified@example.com',
-        role: UserRole.USER,
-        isEmailVerified: false,
       };
 
       const result = await controller.getMyCertificates(user as any, 2, 5);
 
+      // Whether the email may be matched is decided in the service, from the
+      // database, never from anything the caller can influence.
       expect(certificateService.findForRecipient).toHaveBeenCalledWith(
         'user-123',
         2,
         5,
-        undefined,
       );
       expect(result).toEqual(mockCerts);
     });

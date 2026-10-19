@@ -268,18 +268,12 @@ export class CertificateController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getMyCertificates(
-    @CurrentUser() user: AuthenticatedUser & { isEmailVerified?: boolean },
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
-    const verifiedEmail =
-      user.isEmailVerified !== false ? user.email : undefined;
-    return this.certificateService.findForRecipient(
-      user.id,
-      +page,
-      +limit,
-      verifiedEmail,
-    );
+    // Email matching is gated on the verified flag inside the service.
+    return this.certificateService.findForRecipient(user.id, +page, +limit);
   }
 
   @Get('user/:userId')

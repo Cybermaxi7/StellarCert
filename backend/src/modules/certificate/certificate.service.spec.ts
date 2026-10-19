@@ -19,6 +19,7 @@ import { MAX_EXPORT_LIMIT, MAX_PAGE_LIMIT } from './dto/export-filters.dto';
 
 describe('CertificateService', () => {
   let service: CertificateService;
+  const userRepository = { findOne: jest.fn() };
   const mockQueryBuilder = {
     leftJoinAndSelect: jest.fn().mockReturnThis(),
     leftJoin: jest.fn().mockReturnThis(),
@@ -68,7 +69,7 @@ describe('CertificateService', () => {
         },
         {
           provide: getRepositoryToken(User),
-          useValue: {},
+          useValue: userRepository,
         },
         {
           provide: DuplicateDetectionService,
@@ -535,23 +536,20 @@ describe('CertificateService', () => {
   });
 
   describe('findForRecipient', () => {
-    it('queries by recipientId and verified email when email is provided', async () => {
+    it('also matches the email address once it is verified', async () => {
+      userRepository.findOne.mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'alice@example.com',
+        isEmailVerified: true,
+      });
       mockQueryBuilder.getMany.mockResolvedValueOnce([
-        { id: 'cert-1', recipientId: 'user-1', recipientEmail: 'alice@example.com' },
+        { id: 'cert-1', recipientId: null, recipientEmail: 'alice@example.com' },
       ]);
 
-      const result = await service.findForRecipient(
-        'user-1',
-        1,
-        10,
-        'alice@example.com',
-      );
+      const result = await service.findForRecipient('user-1', 1, 10);
 
-      expect(certificateRepository.createQueryBuilder).toHaveBeenCalledWith(
-        'certificate',
-      );
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        '(certificate.recipientId = :recipientId OR certificate.recipientEmail = :email)',
+        '(certificate.recipientId = :recipientId OR LOWER(certificate.recipientEmail) = LOWER(:email))',
         { recipientId: 'user-1', email: 'alice@example.com' },
       );
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
@@ -559,12 +557,17 @@ describe('CertificateService', () => {
       expect(result).toHaveLength(1);
     });
 
-    it('queries by recipientId only when email is not provided', async () => {
+    it('ignores the email address while it is unverified', async () => {
+      userRepository.findOne.mockResolvedValueOnce({
+        id: 'user-2',
+        email: 'victim@example.com',
+        isEmailVerified: false,
+      });
       mockQueryBuilder.getMany.mockResolvedValueOnce([
         { id: 'cert-2', recipientId: 'user-2' },
       ]);
 
-      const result = await service.findForRecipient('user-2', 2, 5);
+      await service.findForRecipient('user-2', 2, 5);
 
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
         'certificate.recipientId = :recipientId',
@@ -572,7 +575,15 @@ describe('CertificateService', () => {
       );
       expect(mockQueryBuilder.skip).toHaveBeenCalledWith(5);
       expect(mockQueryBuilder.take).toHaveBeenCalledWith(5);
-      expect(result).toHaveLength(1);
+    });
+
+    it('caps the page size', async () => {
+      userRepository.findOne.mockResolvedValueOnce(null);
+      mockQueryBuilder.getMany.mockResolvedValueOnce([]);
+
+      await service.findForRecipient('user-3', 1, 100000);
+
+      expect(mockQueryBuilder.take).not.toHaveBeenCalledWith(100000);
     });
   });
 });

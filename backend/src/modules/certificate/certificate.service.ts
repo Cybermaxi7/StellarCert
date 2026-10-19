@@ -1058,20 +1058,37 @@ export class CertificateService {
       .getMany();
   }
 
+  /**
+   * Certificates belonging to the calling user: those linked by recipientId,
+   * plus those issued to their email address - but only once that address is
+   * verified. Registration does not yet require verification, so trusting an
+   * unverified email would let anyone sign up with someone else's address and
+   * list their certificates. The flag is read from the database because the
+   * JWT carries no verification state.
+   */
   async findForRecipient(
     recipientId: string,
     page = 1,
     limit = 10,
-    email?: string,
   ): Promise<Certificate[]> {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(Math.max(1, Number(limit) || 10), MAX_PAGE_LIMIT);
+
+    const user = await this.userRepository.findOne({
+      where: { id: recipientId },
+      select: { id: true, email: true, isEmailVerified: true },
+    });
+    const verifiedEmail = user?.isEmailVerified ? user.email : undefined;
+
     const qb = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer');
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS);
 
-    if (email) {
+    if (verifiedEmail) {
       qb.where(
-        '(certificate.recipientId = :recipientId OR certificate.recipientEmail = :email)',
-        { recipientId, email },
+        '(certificate.recipientId = :recipientId OR LOWER(certificate.recipientEmail) = LOWER(:email))',
+        { recipientId, email: verifiedEmail },
       );
     } else {
       qb.where('certificate.recipientId = :recipientId', { recipientId });
@@ -1079,8 +1096,8 @@ export class CertificateService {
 
     return qb
       .orderBy('certificate.issuedAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
       .getMany();
   }
 

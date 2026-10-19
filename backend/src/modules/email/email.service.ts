@@ -120,6 +120,8 @@ export class EmailService {
       'transfer-completed',
     ];
 
+    const failed: string[] = [];
+
     templates.forEach((templateName) => {
       const templatePath = path.join(templatesDir, `${templateName}.hbs`);
       try {
@@ -128,11 +130,23 @@ export class EmailService {
         this.templates.set(templateName, compiled);
         this.logger.log(`Template loaded: ${templateName}`);
       } catch (error) {
+        failed.push(templateName);
         this.logger.error(
           `Failed to load template ${templateName}: ${error.message}`,
         );
       }
     });
+
+    // A build that shipped without its templates would otherwise start fine and
+    // then silently send no email. In production that must be a startup failure.
+    if (
+      failed.length > 0 &&
+      this.configService.get<string>('NODE_ENV') === 'production'
+    ) {
+      throw new Error(
+        `Email templates could not be loaded from ${templatesDir}: ${failed.join(', ')}`,
+      );
+    }
   }
 
   async sendEmail(dto: SendEmailDto): Promise<void> {

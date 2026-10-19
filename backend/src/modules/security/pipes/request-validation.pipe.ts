@@ -13,10 +13,9 @@ type Constructor<T = unknown> = new (...args: unknown[]) => T;
 @Injectable()
 export class RequestValidationPipe implements PipeTransform {
   async transform(value: unknown, { metatype }: ArgumentMetadata) {
-    const sanitizedValue = this.sanitizeInput(value);
-
+    // Input is sanitized once, by InputSanitizationMiddleware. This pipe only validates.
     if (!metatype || !this.toValidate(metatype)) {
-      return sanitizedValue;
+      return value;
     }
 
     // A body-less request (POST /auth/logout, for instance) arrives as
@@ -25,7 +24,7 @@ export class RequestValidationPipe implements PipeTransform {
     // 'constructor')" - which surfaced as a 500 on an ordinary logout.
     // Validating an empty object instead keeps DTOs with required fields
     // failing as proper 400s while letting empty-bodied DTOs through.
-    const object = plainToClass(metatype, sanitizedValue ?? {});
+    const object = plainToClass(metatype, value ?? {});
     const errors = await validate(object, {
       skipMissingProperties: false,
       whitelist: true,
@@ -47,36 +46,6 @@ export class RequestValidationPipe implements PipeTransform {
   private toValidate(metatype: Constructor): boolean {
     const types: Constructor[] = [String, Boolean, Number, Array, Object];
     return !types.includes(metatype);
-  }
-
-  private sanitizeInput(value: unknown): unknown {
-    if (typeof value === 'string') {
-      return value
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .split('')
-        .filter((char) => {
-          const code = char.charCodeAt(0);
-          return code >= 32 && code !== 127;
-        })
-        .join('')
-        .trim();
-    }
-
-    if (Array.isArray(value)) {
-      return value.map((item) => this.sanitizeInput(item));
-    }
-
-    if (value && typeof value === 'object') {
-      return Object.entries(value as Record<string, unknown>).reduce(
-        (acc, [key, currentValue]) => {
-          acc[key] = this.sanitizeInput(currentValue);
-          return acc;
-        },
-        {} as Record<string, unknown>,
-      );
-    }
-
-    return value;
   }
 
   private formatErrors(

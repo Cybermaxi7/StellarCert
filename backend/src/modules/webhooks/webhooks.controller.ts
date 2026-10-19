@@ -21,11 +21,16 @@ import { WebhooksService } from './webhooks.service';
 import { CreateWebhookSubscriptionDto } from './dto/create-webhook-subscription.dto';
 import { WebhookEvent } from './entities/webhook-subscription.entity';
 import { JwtAuthGuard } from 'src/common';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles';
 import { CurrentUser } from '../users/decorators/current-user.decorator';
 
 @ApiTags('Webhooks')
 @Controller('webhooks')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+// Webhooks make the server call out to a URL the caller chooses, so they are an issuer feature.
+@Roles(UserRole.ISSUER, UserRole.ADMIN)
 @ApiBearerAuth()
 export class WebhooksController {
   constructor(private readonly webhooksService: WebhooksService) {}

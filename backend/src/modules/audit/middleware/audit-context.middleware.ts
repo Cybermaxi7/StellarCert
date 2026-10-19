@@ -4,6 +4,7 @@ import { randomUUID as uuidv4 } from 'crypto';
 import { RequestContextService } from '../services';
 import { IRequestContext } from '../interfaces';
 import { LoggingService } from '../../../common/logging/logging.service';
+import { getClientIp } from '../../../common/utils/client-ip.util';
 
 @Injectable()
 export class AuditContextMiddleware implements NestMiddleware {
@@ -49,10 +50,7 @@ export class AuditContextMiddleware implements NestMiddleware {
   }
 
   private getClientIp(req: Request): string {
-    return (
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
-      req.socket.remoteAddress ||
-      'unknown'
-    );
+    // Forwarded headers count only when they come from a configured trusted proxy.
+    return getClientIp(req);
   }
 }

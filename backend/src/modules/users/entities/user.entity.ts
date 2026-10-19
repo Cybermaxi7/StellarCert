@@ -69,7 +69,7 @@ export class User {
   @Column({ nullable: true })
   emailVerificationToken: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   emailVerificationExpires: Date;
 
   @Column({ nullable: true })
@@ -79,7 +79,7 @@ export class User {
   @Index()
   passwordResetTokenHash: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   passwordResetExpires: Date;
 
   @Column({ default: true })
@@ -91,16 +91,16 @@ export class User {
   @Column({ default: 0 })
   loginAttempts: number;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastLoginAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lockedUntil: Date;
 
   @Column({ type: 'varchar', nullable: true })
   refreshToken: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   refreshTokenExpires: Date | null;
 
   @Column({ default: false })
@@ -112,10 +112,10 @@ export class User {
   @Column({ type: 'simple-array', nullable: true, select: false })
   twoFactorBackupCodes: string[] | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 
   // Virtual property for full name

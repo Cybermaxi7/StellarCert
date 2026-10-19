@@ -62,6 +62,7 @@ import {
   MAX_EXPORT_LIMIT,
 } from './dto/export-filters.dto';
 import { IpRateLimitGuard } from '../../common/guards/ip-rate-limit.guard';
+import { getClientIp } from '../../common/utils/client-ip.util';
 import { BulkSizeLimitPipe } from '../../common/pipes/bulk-size-limit.pipe';
 
 @ApiTags('Certificates')
@@ -163,7 +164,7 @@ export class CertificateController {
     @Req() req: Request,
     @Query('verifiedBy') verifiedBy?: string,
   ): Promise<unknown> {
-    const ipAddress = req.ip ?? 'unknown';
+    const ipAddress = getClientIp(req);
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     try {
       const cert = await this.certificateService.verifyByCode(
@@ -191,7 +192,7 @@ export class CertificateController {
     @Param('hash') hash: string,
     @Req() req: Request,
   ): Promise<unknown> {
-    const ipAddress = req.ip ?? 'unknown';
+    const ipAddress = getClientIp(req);
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     return this.certificateService.verifyByStellarHash(
       hash,
@@ -375,7 +376,7 @@ export class CertificateController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() req: Request,
   ): Promise<unknown> {
-    const ipAddress = req.ip ?? 'unknown';
+    const ipAddress = getClientIp(req);
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     const cert = await this.certificateService.issue(
       dto,
@@ -413,7 +414,7 @@ export class CertificateController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() req: Request,
   ): Promise<unknown> {
-    const ipAddress = req.ip ?? 'unknown';
+    const ipAddress = getClientIp(req);
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     return this.certificateService.revokeWithUser(
       id,

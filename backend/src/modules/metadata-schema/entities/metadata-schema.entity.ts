@@ -70,9 +70,9 @@ export class MetadataSchema {
   @Column({ type: 'varchar', nullable: true })
   previousVersionId: string | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

@@ -4,8 +4,8 @@ extern crate std;
 
 use super::crl::*;
 use soroban_sdk::{
-    contract, contractimpl, testutils::Address as _, testutils::Events as _, Address, Env,
-    IntoVal, String, Symbol, Val,
+    contract, contractimpl, testutils::Address as _, testutils::Events as _, Address, Bytes,
+    BytesN, Env, IntoVal, String, Symbol, Val,
 };
 use std::string::ToString;
 
@@ -52,6 +52,32 @@ fn make_client(env: &Env) -> (Address, CRLContractClient<'_>) {
     let contract_id = env.register(CRLContract, ());
     let client = CRLContractClient::new(env, &contract_id);
     (contract_id, client)
+}
+
+fn expected_leaf_hash(env: &Env, id: &str) -> BytesN<32> {
+    let mut data = [0u8; 257];
+    data[1..id.len() + 1].copy_from_slice(id.as_bytes());
+    env.crypto()
+        .sha256(&Bytes::from_slice(env, &data[..id.len() + 1]))
+        .into()
+}
+
+fn expected_node_hash(env: &Env, left: &BytesN<32>, right: &BytesN<32>) -> BytesN<32> {
+    let mut data = [0u8; 65];
+    data[0] = 1;
+    data[1..33].copy_from_slice(&left.to_array());
+    data[33..].copy_from_slice(&right.to_array());
+    env.crypto()
+        .sha256(&Bytes::from_slice(env, &data))
+        .into()
+}
+
+fn hash_to_string(env: &Env, hash: &BytesN<32>) -> String {
+    let mut hex = std::string::String::new();
+    for byte in hash.to_array() {
+        hex.push_str(&std::format!("{byte:02x}"));
+    }
+    String::from_str(env, &hex)
 }
 
 // ─── Initialization ───────────────────────────────────────────────────────────
@@ -259,29 +285,33 @@ fn test_merkle_root_is_deterministic() {
 
 #[test]
 fn test_merkle_root_odd_number_of_leaves() {
-    // Odd leaf count triggers the "duplicate last leaf" branch in the tree.
-    // Result must still be a valid 64-char hex string and differ from even.
     let (env, issuer, cert_contract) = setup();
     let (_, client) = make_client(&env);
     env.mock_all_auths();
     client.initialize(&issuer, &cert_contract);
 
-    for i in 0u32..3 {
-        let s = soroban_sdk::String::from_str(&env, &["ID-", &i.to_string()].concat());
-        client.revoke_certificate(&issuer, &s, &RevocationReason::Superseded, &None);
-    }
-    let root_odd = client.get_merkle_root();
-    assert_eq!(root_odd.len(), 64);
+    let ids = ["ID-0", "ID-1", "ID-2", "ID-3"];
+    let leaves = ids.map(|id| expected_leaf_hash(&env, id));
+    for (index, id) in ids.iter().enumerate() {
+        let cert_id = String::from_str(&env, id);
+        client.revoke_certificate(&issuer, &cert_id, &RevocationReason::Superseded, &None);
 
-    client.revoke_certificate(
-        &issuer,
-        &String::from_str(&env, "ID-3"),
-        &RevocationReason::Superseded,
-        &None,
-    );
-    let root_even = client.get_merkle_root();
-    assert_eq!(root_even.len(), 64);
-    assert_ne!(root_odd, root_even);
+        let expected = match index {
+            0 => leaves[0].clone(),
+            1 => expected_node_hash(&env, &leaves[0], &leaves[1]),
+            2 => expected_node_hash(
+                &env,
+                &expected_node_hash(&env, &leaves[0], &leaves[1]),
+                &leaves[2],
+            ),
+            _ => expected_node_hash(
+                &env,
+                &expected_node_hash(&env, &leaves[0], &leaves[1]),
+                &expected_node_hash(&env, &leaves[2], &leaves[3]),
+            ),
+        };
+        assert_eq!(client.get_merkle_root(), hash_to_string(&env, &expected));
+    }
 }
 
 // ─── Pagination ───────────────────────────────────────────────────────────────

@@ -139,7 +139,7 @@ export const useUserCertificatesQuery = (userId: string | undefined) =>
 export const useCertificatesQuery = (params: CertificateListParams) =>
   useQuery({
     queryKey: queryKeys.certificates.list(params),
-    queryFn: () => certificateApi.list(params),
+    queryFn: ({ signal }) => certificateApi.list({ ...params, signal }),
     // Keep the previous page on screen while the next one loads, so paging
     // through results doesn't flash an empty table.
     placeholderData: keepPreviousData,

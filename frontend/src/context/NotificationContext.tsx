@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { API_URL } from '../api';
-import { tokenStorage } from '../api/tokens';
+import { tokenStorage, subscribeTokenRefresh } from '../api/tokens';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     queryKeys,
@@ -91,17 +91,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         connectSocket(token);
 
-        // #563 — reconnect with the new token whenever it is rotated.
-        const handleTokenRotation = (e: StorageEvent) => {
-            if (e.key === 'accessToken' && e.newValue && e.newValue !== e.oldValue) {
-                connectSocket(e.newValue);
+        // Reconnect with the fresh access token whenever it is silently rotated/refreshed.
+        const unsubscribe = subscribeTokenRefresh((newToken) => {
+            if (newToken && newToken !== token) {
+                connectSocket(newToken);
             }
-        };
-
-        window.addEventListener('storage', handleTokenRotation);
+        });
 
         return () => {
-            window.removeEventListener('storage', handleTokenRotation);
+            unsubscribe();
             socketRef.current?.disconnect();
         };
     }, [isAuthenticated, queryClient, connectSocket]);

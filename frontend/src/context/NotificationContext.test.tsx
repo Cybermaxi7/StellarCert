@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider, useNotifications } from './NotificationContext';
 import { useAuth } from './AuthContext';
 import { apiClient } from '../api/endpoints';
-import { tokenStorage } from '../api/tokens';
+import { tokenStorage, notifyTokenRefreshed } from '../api/tokens';
+import { io } from 'socket.io-client';
 import { createTestQueryClient, renderWithProviders } from '../test/renderWithProviders';
 
 const socket = {
@@ -65,5 +66,30 @@ describe('NotificationProvider authentication lifecycle', () => {
 
         expect(apiClient).toHaveBeenCalledWith('/notifications');
         expect(socket.on).toHaveBeenCalledWith('newNotification', expect.any(Function));
+    });
+
+    it('reconnects the socket with the new token when token is refreshed', async () => {
+        tokenStorage.setAccessToken('initial-token');
+        vi.mocked(useAuth).mockReturnValue({ isAuthenticated: true } as ReturnType<typeof useAuth>);
+
+        renderWithProviders(
+            <NotificationProvider>
+                <Consumer />
+            </NotificationProvider>,
+            { queryClient: createTestQueryClient() },
+        );
+
+        expect(io).toHaveBeenCalledWith('http://localhost:3000', {
+            auth: { token: 'initial-token' },
+        });
+
+        await act(async () => {
+            notifyTokenRefreshed('refreshed-token');
+        });
+
+        expect(socket.disconnect).toHaveBeenCalled();
+        expect(io).toHaveBeenLastCalledWith('http://localhost:3000', {
+            auth: { token: 'refreshed-token' },
+        });
     });
 });

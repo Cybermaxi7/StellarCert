@@ -5,14 +5,30 @@ import type { User } from './types';
  * AuthContext can keep its reactive `isAuthenticated` / `user` state in sync.
  * The fresh `user` from the refresh response is forwarded when available.
  */
-type TokenRefreshCallback = (accessToken: string, user?: User | null) => void;
+export type TokenRefreshCallback = (accessToken: string, user?: User | null) => void;
 
-let _onTokenRefreshed: TokenRefreshCallback | null = null;
-export const setTokenRefreshCallback = (cb: TokenRefreshCallback) => {
-  _onTokenRefreshed = cb;
+const _tokenRefreshSubscribers = new Set<TokenRefreshCallback>();
+
+export const subscribeTokenRefresh = (cb: TokenRefreshCallback): (() => void) => {
+  _tokenRefreshSubscribers.add(cb);
+  return () => {
+    _tokenRefreshSubscribers.delete(cb);
+  };
 };
+
+export const setTokenRefreshCallback = (cb: TokenRefreshCallback) => {
+  _tokenRefreshSubscribers.clear();
+  _tokenRefreshSubscribers.add(cb);
+};
+
 export const notifyTokenRefreshed = (accessToken: string, user?: User | null) => {
-  _onTokenRefreshed?.(accessToken, user);
+  _tokenRefreshSubscribers.forEach((cb) => {
+    try {
+      cb(accessToken, user);
+    } catch (err) {
+      console.error('Error in token refresh callback:', err);
+    }
+  });
 };
 
 let _inMemoryAccessToken: string | null = null;

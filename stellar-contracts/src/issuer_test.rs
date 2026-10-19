@@ -231,7 +231,7 @@ fn test_get_certificates_by_issuer_accepts_limit_at_max() {
 #[test]
 fn test_freeze_certificate_allows_authorized_issuer() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -255,7 +255,7 @@ fn test_freeze_certificate_allows_authorized_issuer() {
 #[should_panic(expected = "Address is not an authorized issuer")]
 fn test_freeze_certificate_rejects_removed_issuer() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -280,7 +280,7 @@ fn test_freeze_certificate_rejects_removed_issuer() {
 #[should_panic(expected = "Address is not an authorized issuer")]
 fn test_unfreeze_certificate_rejects_removed_issuer() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);

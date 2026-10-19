@@ -209,7 +209,7 @@ fn test_update_metadata_uri_rejects_missing_issuer_signature() {
 #[test]
 fn test_update_frozen_certificate_metadata() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);

@@ -17,7 +17,7 @@ struct Fixture {
 
 fn setup() -> Fixture {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -216,7 +216,7 @@ fn test_normal_transfer_still_works() {
 #[should_panic(expected = "Admin already initialized")]
 fn test_second_initialize_fails() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let c = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -234,7 +234,7 @@ fn test_initialize_without_auth_fails() {
     // No mock_all_auths: initialize now requires the admin's signature, so a
     // caller who cannot produce it is rejected.
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let c = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);

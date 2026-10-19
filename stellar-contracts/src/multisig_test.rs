@@ -582,7 +582,7 @@ fn test_set_certificate_contract_rejects_missing_admin_auth() {
 #[test]
 fn test_certificate_contract_propose_certificate_records_pending_request() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -623,7 +623,7 @@ fn test_certificate_contract_propose_certificate_records_pending_request() {
 #[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
 fn test_certificate_contract_propose_certificate_requires_issuer_auth() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     // Do NOT invoke mock_all_auths(): proposing on behalf of `issuer` must be
@@ -645,7 +645,7 @@ fn test_certificate_contract_propose_certificate_requires_issuer_auth() {
 #[should_panic(expected = "Issuer does not have multisig configuration")]
 fn test_certificate_contract_propose_certificate_rejects_unconfigured_issuer() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -667,7 +667,7 @@ fn test_certificate_contract_propose_certificate_rejects_unconfigured_issuer() {
 #[should_panic(expected = "Request already exists")]
 fn test_certificate_contract_propose_certificate_rejects_duplicate_request_id() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, CertificateContract);
+    let contract_id = env.register(CertificateContract, ());
     let client = CertificateContractClient::new(&env, &contract_id);
 
     let admin = Address::generate(&env);
@@ -697,7 +697,7 @@ fn setup_multisig(
     Address,
     Address,
 ) {
-    let contract_id = env.register_contract(None, MultisigCertificateContract);
+    let contract_id = env.register(MultisigCertificateContract, ());
     let client = MultisigCertificateContractClient::new(env, &contract_id);
 
     let admin = Address::generate(env);

@@ -16,12 +16,12 @@ fn setup() -> (Env, Address, Address, Address, Address) {
     let issuer = Address::generate(&env);
     let owner = Address::generate(&env);
 
-    let cert_id = env.register_contract(None, CertificateContract);
+    let cert_id = env.register(CertificateContract, ());
     let cert = CertificateContractClient::new(&env, &cert_id);
     cert.initialize(&admin);
     cert.add_issuer(&issuer);
 
-    let crl_id = env.register_contract(None, CRLContract);
+    let crl_id = env.register(CRLContract, ());
     let crl = CRLContractClient::new(&env, &crl_id);
     crl.initialize(&issuer, &cert_id);
 
@@ -109,7 +109,7 @@ fn revoke_without_a_configured_crl_still_works() {
     let issuer = Address::generate(&env);
     let owner = Address::generate(&env);
 
-    let cert_id = env.register_contract(None, CertificateContract);
+    let cert_id = env.register(CertificateContract, ());
     let cert = CertificateContractClient::new(&env, &cert_id);
     cert.initialize(&admin);
     cert.add_issuer(&issuer);
@@ -153,12 +153,12 @@ fn revoke_reverts_when_the_crl_rejects_the_mirrored_call() {
     let issuer = Address::generate(&env);
     let owner = Address::generate(&env);
 
-    let cert_id = env.register_contract(None, CertificateContract);
+    let cert_id = env.register(CertificateContract, ());
     let cert = CertificateContractClient::new(&env, &cert_id);
     cert.initialize(&admin);
     cert.add_issuer(&issuer);
 
-    let crl_id = env.register_contract(None, RejectingCrlStub);
+    let crl_id = env.register(RejectingCrlStub, ());
     cert.set_crl_contract(&crl_id);
 
     let id = issue(&env, &cert_id, &issuer, &owner, "cert-revert");

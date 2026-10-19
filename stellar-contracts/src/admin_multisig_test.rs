@@ -51,7 +51,7 @@ fn test_admin_multisig_flow() {
 #[should_panic(expected = "Unsupported action type")]
 fn test_other_action_panics_on_execution() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let contract_id = env.register(AdminMultisigContract, ());
     let client = AdminMultisigContractClient::new(&env, &contract_id);
 
     let admin1 = Address::generate(&env);
@@ -201,7 +201,7 @@ fn test_cancel_proposal() {
 #[test]
 fn test_proposal_payload_is_untouched_by_cancellation() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let contract_id = env.register(AdminMultisigContract, ());
     let client = AdminMultisigContractClient::new(&env, &contract_id);
 
     let admin1 = Address::generate(&env);
@@ -230,7 +230,7 @@ fn test_proposal_payload_is_untouched_by_cancellation() {
 #[should_panic(expected = "Proposal is not pending")]
 fn test_cancelled_proposal_cannot_be_approved() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let contract_id = env.register(AdminMultisigContract, ());
     let client = AdminMultisigContractClient::new(&env, &contract_id);
 
     let admin1 = Address::generate(&env);
@@ -254,7 +254,7 @@ fn test_cancelled_proposal_cannot_be_approved() {
 #[should_panic(expected = "Proposal is not pending")]
 fn test_cancelled_proposal_cannot_be_cancelled_twice() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let contract_id = env.register(AdminMultisigContract, ());
     let client = AdminMultisigContractClient::new(&env, &contract_id);
 
     let admin1 = Address::generate(&env);
@@ -274,7 +274,7 @@ fn test_cancelled_proposal_cannot_be_cancelled_twice() {
 #[should_panic(expected = "Only proposer can cancel")]
 fn test_only_proposer_can_cancel() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let contract_id = env.register(AdminMultisigContract, ());
     let client = AdminMultisigContractClient::new(&env, &contract_id);
 
     let admin1 = Address::generate(&env);
@@ -294,7 +294,7 @@ fn test_only_proposer_can_cancel() {
 #[should_panic(expected = "Invalid admin multisig configuration")]
 fn test_init_rejects_threshold_above_signer_count() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let contract_id = env.register(AdminMultisigContract, ());
     let client = AdminMultisigContractClient::new(&env, &contract_id);
 
     let admin1 = Address::generate(&env);
@@ -310,7 +310,7 @@ fn test_init_rejects_threshold_above_signer_count() {
 #[should_panic(expected = "Not an authorized admin signer")]
 fn test_non_signer_cannot_read_proposal() {
     let env = Env::default();
-    let contract_id = env.register_contract(None, AdminMultisigContract);
+    let contract_id = env.register(AdminMultisigContract, ());
     let client = AdminMultisigContractClient::new(&env, &contract_id);
 
     let admin1 = Address::generate(&env);

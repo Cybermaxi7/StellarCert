@@ -242,7 +242,7 @@ export interface AdminAnalytics {
 export interface AuditLogItem {
   id: string;
   action: string;
-  description: string;
+  description?: string;
   userId?: string;
   resourceId?: string;
   resourceType?: string;
@@ -258,6 +258,7 @@ export interface AuditLogItem {
 export interface AuditLogSearchResponse {
   data: AuditLogItem[];
   total: number;
+  nextCursor?: string | null;
 }
 
 export interface AuditStatistics {

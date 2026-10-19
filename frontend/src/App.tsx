@@ -29,6 +29,7 @@ const NotificationPreferences = lazy(
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AccountSecurity = lazy(() => import("./pages/AccountSecurity"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminAuditLogs = lazy(() => import("./pages/AdminAuditLogs"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -95,6 +96,7 @@ function App() {
                     }
                   >
                     <Route path="/admin/users" element={<AdminUsers />} />
+                    <Route path="/admin/audit" element={<AdminAuditLogs />} />
                   </Route>
 
                   {/* Account routes — any authenticated user, regardless of role */}

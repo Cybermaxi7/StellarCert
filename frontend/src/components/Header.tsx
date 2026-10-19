@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
-import { Menu, User, X, Users, ShieldCheck } from 'lucide-react';
+import { Activity, Menu, User, X, Users, ShieldCheck } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../api/types';
@@ -52,6 +52,9 @@ export default function Header(): JSX.Element {
       : []),
     ...(user?.role === UserRole.ADMIN
       ? ([{ label: 'Users', to: '/admin/users', icon: <Users className="h-4 w-4" />}] as NavItem[])
+      : []),
+    ...(user?.role === UserRole.ADMIN
+      ? ([{ label: 'Audit', to: '/admin/audit', icon: <Activity className="h-4 w-4" />}] as NavItem[])
       : []),
     ...(user
       ? ([

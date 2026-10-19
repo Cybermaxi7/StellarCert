@@ -201,7 +201,15 @@ export const useAuditStatisticsQuery = (params: DateRangeParams) =>
   });
 
 export const useAuditSearchQuery = (
-  params: DateRangeParams & { limit?: number },
+  params: DateRangeParams & {
+    action?: string;
+    cursor?: string;
+    resourceId?: string;
+    resourceType?: string;
+    take?: number;
+    userId?: string;
+    userEmail?: string;
+  },
 ) =>
   useQuery({
     queryKey: queryKeys.audit.search(params),

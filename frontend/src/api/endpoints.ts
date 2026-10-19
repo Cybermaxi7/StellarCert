@@ -1564,7 +1564,7 @@ export const auditApi = {
       };
     }
 
-    return apiClient(`/audit/search?${searchParams.toString()}`);
+    return apiClient(`/audit/logs?${searchParams.toString()}`);
   },
   getStatistics: async (
     params?: Record<string, string | number | boolean | undefined>,

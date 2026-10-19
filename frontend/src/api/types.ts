@@ -186,6 +186,9 @@ export interface UsersByRoleStats {
   users: number;
   issuers: number;
   admins: number;
+  auditors?: number;
+  recipients?: number;
+  verifiers?: number;
   total: number;
 }
 

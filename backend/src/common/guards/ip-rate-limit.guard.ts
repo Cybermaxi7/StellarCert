@@ -9,10 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import { isIP } from 'net';
-
-/** Returned when no usable address can be determined for a request. */
-const UNKNOWN_IP = 'unknown';
+import { parseTrustedProxyIps, resolveClientIp } from '../utils/client-ip.util';
 
 export interface RateLimitEntry {
   count: number;
@@ -46,9 +43,18 @@ export interface RateLimitStore {
  * implementation against {@link RATE_LIMIT_STORE} to fix that.
  */
 export class InMemoryRateLimitStore implements RateLimitStore {
+  private static readonly SWEEP_INTERVAL_MS = 60_000;
+
   private readonly entries = new Map<string, RateLimitEntry>();
+  private lastSweep = 0;
 
   async consume(key: string, windowMs: number, now: number): Promise<RateLimitEntry> {
+    // Drop expired counters now and then so the map cannot grow without bound.
+    if (now - this.lastSweep >= InMemoryRateLimitStore.SWEEP_INTERVAL_MS) {
+      this.lastSweep = now;
+      await this.prune(now);
+    }
+
     const existing = this.entries.get(key);
     const entry =
       !existing || now > existing.resetTime
@@ -71,23 +77,6 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   }
 }
 
-/**
- * Strip an IPv4-mapped IPv6 prefix so `::ffff:10.0.0.1` and `10.0.0.1` are
- * treated as the same address, and return undefined for anything that is not a
- * valid IP.
- */
-function normaliseIp(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-
-  const trimmed = value.trim().replace(/^\[|\]$/g, '');
-  if (!trimmed) return undefined;
-
-  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(trimmed);
-  const candidate = mapped ? mapped[1] : trimmed;
-
-  return isIP(candidate) ? candidate : undefined;
-}
-
 @Injectable()
 export class IpRateLimitGuard implements CanActivate {
   /**
@@ -101,7 +90,6 @@ export class IpRateLimitGuard implements CanActivate {
   private readonly windowMs: number;
   private readonly maxRequests: number;
   private readonly trustedProxyIps: Set<string>;
-  private readonly trustProxyHops: number;
 
   constructor(
     private readonly configService: ConfigService,
@@ -121,14 +109,9 @@ export class IpRateLimitGuard implements CanActivate {
 
     // Empty by default: forwarded headers are ignored until an operator states
     // which peers are allowed to set them.
-    this.trustedProxyIps = new Set(
-      this.configService
-        .get<string>('TRUSTED_PROXY_IPS', '')
-        .split(',')
-        .map((ip) => normaliseIp(ip))
-        .filter((ip): ip is string => ip !== undefined),
+    this.trustedProxyIps = parseTrustedProxyIps(
+      this.configService.get<string>('TRUSTED_PROXY_IPS', ''),
     );
-    this.trustProxyHops = this.configService.get<number>('TRUST_PROXY_HOPS', 0);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -168,57 +151,12 @@ export class IpRateLimitGuard implements CanActivate {
   }
 
   /**
-   * Resolve the address a request should be counted against (#727).
-   *
-   * `X-Forwarded-For` and `X-Real-IP` are client-supplied, so they are only
-   * read when the immediate peer is a proxy this deployment actually runs. With
-   * no trusted proxies configured they are ignored entirely and the socket
-   * address is used, which is the safe default.
+   * Resolve the address a request should be counted against (#727). Forwarded
+   * headers are only honoured from the configured trusted proxies; see
+   * {@link resolveClientIp}.
    */
   private getClientIp(request: Request): string {
-    const peer =
-      normaliseIp(request.socket?.remoteAddress) ??
-      normaliseIp(request.connection?.remoteAddress) ??
-      UNKNOWN_IP;
-
-    if (!this.isTrustedProxy(peer)) {
-      return peer;
-    }
-
-    const chain = this.parseForwardedChain(request.headers['x-forwarded-for']);
-    if (chain.length > 0) {
-      // Walk right-to-left past proxies we control. The first address that is
-      // not one of ours is the client; anything further left was appended by
-      // the client itself and is ignored.
-      for (let index = chain.length - 1; index >= 0; index -= 1) {
-        if (!this.isTrustedProxy(chain[index])) return chain[index];
-      }
-      return peer;
-    }
-
-    return (
-      normaliseIp(request.headers['x-real-ip']) ?? peer
-    );
-  }
-
-  /**
-   * Parse an `X-Forwarded-For` header into validated addresses, left to right.
-   *
-   * A header containing anything that is not a valid IP is rejected wholesale
-   * rather than partially trusted.
-   */
-  private parseForwardedChain(header: unknown): string[] {
-    const raw = Array.isArray(header) ? header.join(',') : header;
-    if (typeof raw !== 'string' || raw.trim() === '') return [];
-
-    const parts = raw.split(',').map((part) => normaliseIp(part));
-    if (parts.some((part) => part === undefined)) return [];
-
-    return parts as string[];
-  }
-
-  private isTrustedProxy(ip: string): boolean {
-    return this.trustedProxyIps.has(ip);
+    return resolveClientIp(request, this.trustedProxyIps);
   }
 
   private pruneMirror(now: number): void {

@@ -25,6 +25,7 @@ import {
   certificateApi,
   createCertificate,
   fetchDefaultTemplate,
+  getMyCertificates,
   getUserCertificates,
   issuerProfileApi,
   revokeCertificate,
@@ -54,6 +55,7 @@ export const queryKeys = {
   certificates: {
     root: ["certificates"] as const,
     list: (params: unknown) => ["certificates", "list", params] as const,
+    me: () => ["certificates", "me"] as const,
     user: (userId: string) => ["certificates", "user", userId] as const,
     verification: (serialNumber: string) =>
       ["certificates", "verify", serialNumber] as const,
@@ -111,6 +113,17 @@ export const useSessionQuery = (enabled: boolean) =>
   });
 
 // ── Certificates ───────────────────────────────────────────────────────────
+
+/**
+ * Certificates held by the currently authenticated recipient user.
+ * Queries GET /certificates/me to prevent IDOR vulnerability.
+ */
+export const useMyCertificatesQuery = (enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.certificates.me(),
+    queryFn: () => getMyCertificates(),
+    enabled,
+  });
 
 /**
  * Certificates held by one user. Shared by the recipient dashboard and the

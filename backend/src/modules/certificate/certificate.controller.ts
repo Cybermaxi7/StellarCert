@@ -260,6 +260,28 @@ export class CertificateController {
     );
   }
 
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'List certificates for the authenticated recipient user',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getMyCertificates(
+    @CurrentUser() user: AuthenticatedUser & { isEmailVerified?: boolean },
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    const verifiedEmail =
+      user.isEmailVerified !== false ? user.email : undefined;
+    return this.certificateService.findForRecipient(
+      user.id,
+      +page,
+      +limit,
+      verifiedEmail,
+    );
+  }
+
   @Get('user/:userId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.USER)
@@ -274,6 +296,7 @@ export class CertificateController {
   ) {
     return this.certificateService.getUserCertificates(userId, +page, +limit);
   }
+
 
   @Get('export')
   @UseGuards(JwtAuthGuard, RolesGuard)

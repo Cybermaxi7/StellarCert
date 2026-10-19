@@ -569,6 +569,29 @@ export const getCertificatePdfUrl = async (
   }
 };
 
+export const getMyCertificates = async (): Promise<Certificate[]> => {
+  if (import.meta.env.VITE_USE_DUMMY_DATA === "true") {
+    await simulateDelay();
+    return dummyData.certificates;
+  }
+
+  try {
+    const result = await apiClient<
+      | Certificate[]
+      | { certificates: Certificate[]; total: number }
+      | PaginatedResponse<Certificate>
+    >('/certificates/me');
+    if (Array.isArray(result)) return result;
+    if ("data" in result)
+      return (result as PaginatedResponse<Certificate>).data;
+    if ("certificates" in result)
+      return (result as { certificates: Certificate[] }).certificates;
+    return [];
+  } catch (error) {
+    return handleError(error, "getMyCertificates");
+  }
+};
+
 export const getUserCertificates = async (
   userId: string,
 ): Promise<Certificate[]> => {
@@ -595,6 +618,7 @@ export const getUserCertificates = async (
     return handleError(error, "getUserCertificates");
   }
 };
+
 
 export const getCertificateQR = async (
   certificateId: string,
@@ -670,6 +694,7 @@ export const certificateApi = {
       `/certificates?${searchParams.toString()}`,
     );
   },
+  getMyCertificates,
   getUserCertificates,
   bulkExport: async (
     certificateIds: string[],

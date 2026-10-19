@@ -533,4 +533,47 @@ describe('CertificateService', () => {
       );
     });
   });
+
+  describe('findForRecipient', () => {
+    it('queries by recipientId and verified email when email is provided', async () => {
+      mockQueryBuilder.getMany.mockResolvedValueOnce([
+        { id: 'cert-1', recipientId: 'user-1', recipientEmail: 'alice@example.com' },
+      ]);
+
+      const result = await service.findForRecipient(
+        'user-1',
+        1,
+        10,
+        'alice@example.com',
+      );
+
+      expect(certificateRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'certificate',
+      );
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        '(certificate.recipientId = :recipientId OR certificate.recipientEmail = :email)',
+        { recipientId: 'user-1', email: 'alice@example.com' },
+      );
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(0);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result).toHaveLength(1);
+    });
+
+    it('queries by recipientId only when email is not provided', async () => {
+      mockQueryBuilder.getMany.mockResolvedValueOnce([
+        { id: 'cert-2', recipientId: 'user-2' },
+      ]);
+
+      const result = await service.findForRecipient('user-2', 2, 5);
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        'certificate.recipientId = :recipientId',
+        { recipientId: 'user-2' },
+      );
+      expect(mockQueryBuilder.skip).toHaveBeenCalledWith(5);
+      expect(mockQueryBuilder.take).toHaveBeenCalledWith(5);
+      expect(result).toHaveLength(1);
+    });
+  });
 });
+

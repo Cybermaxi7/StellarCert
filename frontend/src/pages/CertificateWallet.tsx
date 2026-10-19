@@ -11,16 +11,20 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ArrowRightLeft,
+  ExternalLink,
+  Copy,
+  Link as LinkIcon,
 } from "lucide-react";
 import {
   Certificate,
+  CertificateTransfer,
   certificateApi,
   getCertificatePdfUrl,
 } from "../api";
 import { UserRole, User } from "../api/types";
-import { useUserCertificatesQuery } from "../api/queries";
+import { useMyCertificatesQuery, useUserCertificatesQuery } from "../api/queries";
 import { useAuth } from "../context/AuthContext";
-
 
 /**
  * Returns true if the logged-in user is the recipient of the given certificate.
@@ -42,18 +46,45 @@ const DOWNLOAD_ROLES: readonly UserRole[] = [UserRole.ISSUER, UserRole.ADMIN];
 const CertificateWallet = () => {
   const { user } = useAuth();
 
-  // Shared with the recipient dashboard: the certificates are fetched once and
-  // both routes read the same cache entry.
-  const {
-    data: certificates = [],
-    isPending: loading,
-    isError: certificatesFailed,
-  } = useUserCertificatesQuery(user?.id);
+  // For recipient/user accounts, securely fetch certificates via GET /certificates/me (IDOR-safe).
+  // For admin/issuer testing or inspecting, fallback to useUserCertificatesQuery.
+  const isRecipientUser = !user?.role || user.role === UserRole.RECIPIENT || user.role === UserRole.USER;
+  const myCertsQuery = useMyCertificatesQuery(!!user && isRecipientUser);
+  const userCertsQuery = useUserCertificatesQuery(!isRecipientUser ? user?.id : undefined);
+
+  const certificates = isRecipientUser ? (myCertsQuery.data ?? []) : (userCertsQuery.data ?? []);
+  const loading = isRecipientUser ? myCertsQuery.isPending : userCertsQuery.isPending;
+  const certificatesFailed = isRecipientUser ? myCertsQuery.isError : userCertsQuery.isError;
 
   // QR states
   const [qrCodes, setQrCodes] = useState<Record<string, string>>({});
   const [selectedQR, setSelectedQR] = useState<string | null>(null);
   const [loadingQR, setLoadingQR] = useState<Record<string, boolean>>({});
+
+  // Share Modal states
+  const [sharingCert, setSharingCert] = useState<Certificate | null>(null);
+
+  // Transfer states
+  const [pendingTransfers, setPendingTransfers] = useState<CertificateTransfer[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (user) {
+      certificateApi.transfer
+        .getPending()
+        .then((transfers) => {
+          if (isMounted && Array.isArray(transfers)) {
+            setPendingTransfers(transfers);
+          }
+        })
+        .catch(() => {
+          // Non-critical: failure to load transfer status should not break wallet
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?.email]);
 
   // Only the list request feeds the banner; the QR/PDF actions keep their own
   // message so a failed download never masquerades as a failed page load. The
@@ -66,6 +97,7 @@ const CertificateWallet = () => {
   const error = actionError ?? loadError;
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(9);
 
@@ -98,9 +130,13 @@ const CertificateWallet = () => {
   };
 
   // ✅ SHARE LOGIC
-  const handleShare = async (cert: Certificate) => {
+  const getVerificationUrl = (cert: Certificate) => {
     const serial = cert.serialNumber || cert.id;
-    const url = `${window.location.origin}/verify?serial=${encodeURIComponent(serial)}`;
+    return `${window.location.origin}/verify?serial=${encodeURIComponent(serial)}`;
+  };
+
+  const handleShare = async (cert: Certificate) => {
+    const url = getVerificationUrl(cert);
 
     const copyToClipboard = async () => {
       await navigator.clipboard.writeText(url);
@@ -124,6 +160,7 @@ const CertificateWallet = () => {
       await copyToClipboard();
     }
   };
+
 
   // ✅ PDF VIEW/DOWNLOAD LOGIC
   const handlePdfAction = async (
@@ -288,15 +325,30 @@ const CertificateWallet = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paginatedCertificates.map((cert) => (
               <div key={cert.id} className="bg-white dark:bg-gray-900 rounded-lg shadow-md dark:shadow-none dark:border dark:border-gray-800 p-6">
-                <div className="flex justify-between mb-4">
+                <div className="flex justify-between items-start mb-4 gap-2">
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{cert.title}</h3>
-                  <span
-                    className={`px-2 py-1 text-sm rounded ${getStatusBadgeClass(
-                      cert.status,
-                    )}`}
-                  >
-                    {cert.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`px-2 py-1 text-sm rounded ${getStatusBadgeClass(
+                        cert.status,
+                      )}`}
+                    >
+                      {cert.status}
+                    </span>
+                    {(() => {
+                      const transfer = pendingTransfers.find((t) => t.certificateId === cert.id);
+                      if (!transfer) return null;
+                      return (
+                        <span
+                          data-testid={`transfer-status-${cert.id}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                        >
+                          <ArrowRightLeft className="w-3 h-3" />
+                          Transfer: {transfer.status}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 <div className="mb-6 space-y-2 text-gray-600 dark:text-gray-300">
@@ -316,7 +368,7 @@ const CertificateWallet = () => {
                   return (
                     <div className="space-y-3">
                       {/* Read-only actions — visible to every role */}
-                      <div className="flex justify-between">
+                      <div className="flex justify-between flex-wrap gap-2">
                         <button
                           onClick={() => handlePdfAction(cert, "view")}
                           disabled={actionLoadingId === cert.id}
@@ -351,6 +403,16 @@ const CertificateWallet = () => {
                           </button>
                         )}
 
+                        {/* Share Links modal trigger */}
+                        <button
+                          onClick={() => setSharingCert(cert)}
+                          className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400"
+                          title="Share Link"
+                        >
+                          <LinkIcon className="w-4 h-4" />
+                          Share Link
+                        </button>
+
                         {/* Share: recipient owner only */}
                         {canShare && (
                           <button
@@ -379,6 +441,7 @@ const CertificateWallet = () => {
               </div>
             ))}
           </div>
+
 
           <div className="mt-6 px-2 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-2">
@@ -461,7 +524,102 @@ const CertificateWallet = () => {
           </div>
         </div>
       )}
+
+      {/* ✅ SHARE LINKS MODAL */}
+      {sharingCert && (
+        <div
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Share certificate links"
+        >
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-lg max-w-md w-full dark:border dark:border-gray-800 shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                Share Certificate
+              </h3>
+              <button
+                onClick={() => {
+                  setSharingCert(null);
+                  setShareLinkCopied(false);
+                }}
+                aria-label="Close share modal"
+              >
+                <X className="w-5 h-5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Share the verification link for{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {sharingCert.title}
+              </span>
+              . Anyone with this link can independently verify your certificate.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Public Verification Link
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={getVerificationUrl(sharingCert)}
+                    className="w-full text-xs px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-100 select-all"
+                  />
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(getVerificationUrl(sharingCert));
+                      setShareLinkCopied(true);
+                      setTimeout(() => setShareLinkCopied(false), 2000);
+                    }}
+                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-md flex items-center gap-1 shrink-0 transition-colors"
+                  >
+                    {shareLinkCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800">
+                <a
+                  href={getVerificationUrl(sharingCert)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Open verification page
+                </a>
+
+                {navigator.share && (
+                  <button
+                    onClick={() => handleShare(sharingCert)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    System share
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 };
 

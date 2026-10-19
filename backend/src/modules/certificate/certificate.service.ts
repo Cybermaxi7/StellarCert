@@ -841,6 +841,24 @@ export class CertificateService {
 
   async remove(id: string): Promise<void> {
     const certificate = await this.findOne(id);
+
+    // Issue #1111: an anchored certificate has an on-chain counterpart. Deleting
+    // the row writes no audit entry, sends no revocation to the contract, and
+    // drops the verification history with it - so the API then answers "not
+    // found" while the Soroban record still reports the certificate as Active,
+    // and the audit trail loses its subject.
+    //
+    // Refusing is the half of the fix that needs no schema change: it keeps the
+    // row and the chain in agreement. The revoke-and-archive alternative needs a
+    // soft-delete column and an on-chain revoke call, neither of which exists
+    // today.
+    if (certificate.stellarTransactionHash) {
+      throw new ConflictException(
+        `Certificate ${id} is anchored to transaction ${certificate.stellarTransactionHash} ` +
+          `and cannot be deleted. Revoke it instead so the database and the chain stay in agreement.`,
+      );
+    }
+
     await this.certificateRepository.remove(certificate);
   }
 

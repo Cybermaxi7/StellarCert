@@ -236,12 +236,25 @@ export class UserAuthService {
       throw new BadRequestException('Verification token has expired');
     }
 
-    await this.userRepository.update(user.id, {
+    // Issue #1109: these two must be `null`, not `undefined`. TypeORM's
+    // update() skips any field whose value is `undefined`, so the previous
+    // version wrote only `isEmailVerified` and `status` and left the token in
+    // the row - a verified account could be verified again by re-posting the
+    // same token, and the token stayed readable for the lifetime of the account.
+    //
+    // The assertion is confined to these two columns. Both are declared
+    // `string` / `Date` rather than `| null` on the entity, unlike the adjacent
+    // `refreshToken` and `twoFactorSecret`, which is why `null` does not type
+    // check. Widening both column types to `| null` is the correct follow-up;
+    // it is a separate change because it reaches every reader of these fields.
+    const verifiedUpdate: Partial<User> = {
       isEmailVerified: true,
-      emailVerificationToken: undefined,
-      emailVerificationExpires: undefined,
       status: UserStatus.ACTIVE,
-    });
+      emailVerificationToken: null as unknown as string,
+      emailVerificationExpires: null as unknown as Date,
+    };
+
+    await this.userRepository.update(user.id, verifiedUpdate);
 
     this.logger.log(`Email verified for user: ${user.email}`);
 

@@ -7,7 +7,9 @@ import { Certificate } from './entities/certificate.entity';
 import { Verification } from './entities/verification.entity';
 import { CertificateTransfer } from './entities/certificate-transfer.entity';
 import { CertificateTemplate } from './entities/certificate-template.entity';
+import { ContractEventCursor } from './entities/contract-event-cursor.entity';
 import { User } from '../users/entities/user.entity';
+import { ContractEventIndexerService } from './services/contract-event-indexer.service';
 
 import { CertificateService } from './certificate.service';
 import { CertificateStatsService } from './services/stats.service';
@@ -40,6 +42,7 @@ import { CertificateExpirationJob } from './jobs/certificate-expiration.job';
       User,
       CertificateTransfer,
       CertificateTemplate,
+      ContractEventCursor,
     ]),
     CacheModule.register({
       ttl: 300,
@@ -70,6 +73,7 @@ import { CertificateExpirationJob } from './jobs/certificate-expiration.job';
     CertificateTransferService,
     CertificateMapper,
     CertificateExpirationJob,
+    ContractEventIndexerService,
   ],
   exports: [
     CertificateService,

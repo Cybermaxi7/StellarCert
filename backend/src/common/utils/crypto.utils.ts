@@ -91,7 +91,10 @@ export class CryptoUtils {
    * Verifies an HMAC signature
    */
   static verifyHMAC(data: string, signature: string, secret: string): boolean {
-    const expectedSignature = this.createHMAC(data, secret);
-    return expectedSignature === signature;
+    const expected = Buffer.from(this.createHMAC(data, secret), 'utf8');
+    const actual = Buffer.from(signature ?? '', 'utf8');
+    // timingSafeEqual throws on unequal lengths; a length mismatch is not secret, so return early.
+    if (expected.length !== actual.length) return false;
+    return crypto.timingSafeEqual(expected, actual);
   }
 }

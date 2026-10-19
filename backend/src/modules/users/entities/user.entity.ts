@@ -47,7 +47,8 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.ISSUER,
+    // Least privilege: elevated roles must be set explicitly by the code creating the user.
+    default: UserRole.USER,
   })
   role: UserRole;
 

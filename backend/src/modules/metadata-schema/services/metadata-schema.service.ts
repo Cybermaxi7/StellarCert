@@ -20,6 +20,31 @@ import {
 } from '../dto/metadata-schema.dto';
 import { LoggingService } from '../../../common/logging/logging.service';
 
+const MAX_PATTERN_LENGTH = 200;
+
+/**
+ * Rejects patterns that do not compile or that look prone to catastrophic backtracking
+ * (a quantified group that itself contains a quantifier, such as `(a+)+$`). This is a
+ * conservative heuristic, not a proof; a linear-time engine such as `re2` would be stronger.
+ */
+export function assertSafePattern(fieldName: string, pattern: string): RegExp {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    throw new BadRequestException(
+      `Pattern for field "${fieldName}" is longer than ${MAX_PATTERN_LENGTH} characters`,
+    );
+  }
+  if (/\((?:[^()\\]|\\.)*[+*](?:[^()\\]|\\.)*\)[+*{]/.test(pattern)) {
+    throw new BadRequestException(
+      `Pattern for field "${fieldName}" contains nested quantifiers and is not allowed`,
+    );
+  }
+  try {
+    return new RegExp(pattern);
+  } catch {
+    throw new BadRequestException(`Pattern for field "${fieldName}" is not a valid regular expression`);
+  }
+}
+
 @Injectable()
 export class MetadataSchemaService {
   constructor(
@@ -29,6 +54,7 @@ export class MetadataSchemaService {
   ) {}
 
   async create(dto: CreateMetadataSchemaDto): Promise<MetadataSchema> {
+    dto.fields?.forEach((f) => f.pattern && assertSafePattern(f.name, f.pattern));
     const existing = await this.schemaRepository.findOne({
       where: { name: dto.name, version: dto.version },
     });
@@ -91,6 +117,18 @@ export class MetadataSchemaService {
     dto: UpdateMetadataSchemaDto,
   ): Promise<MetadataSchema> {
     const schema = await this.findOne(id);
+
+    // (name, version) is the uniqueness key that create/upgradeSchema rely on, so it is immutable.
+    if (
+      (dto.name !== undefined && dto.name !== schema.name) ||
+      (dto.version !== undefined && dto.version !== schema.version)
+    ) {
+      throw new BadRequestException(
+        'name and version cannot be changed; create a new version with upgradeSchema instead',
+      );
+    }
+    dto.fields?.forEach((f) => f.pattern && assertSafePattern(f.name, f.pattern));
+
     Object.assign(schema, dto);
 
     const dtoAny = dto as any;
@@ -249,7 +287,8 @@ export class MetadataSchemaService {
           });
         }
         if (field.pattern) {
-          const regex = new RegExp(field.pattern);
+          // Patterns are validated on create/update; recompile defensively for legacy rows.
+          const regex = assertSafePattern(field.name, field.pattern);
           if (!regex.test(value)) {
             errors.push({
               field: field.name,

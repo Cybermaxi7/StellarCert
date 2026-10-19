@@ -163,8 +163,7 @@ export class CertificateController {
     @Req() req: Request,
     @Query('verifiedBy') verifiedBy?: string,
   ): Promise<unknown> {
-    const ipAddress =
-      (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
+    const ipAddress = req.ip ?? 'unknown';
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     try {
       const cert = await this.certificateService.verifyByCode(
@@ -192,8 +191,7 @@ export class CertificateController {
     @Param('hash') hash: string,
     @Req() req: Request,
   ): Promise<unknown> {
-    const ipAddress =
-      (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
+    const ipAddress = req.ip ?? 'unknown';
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     return this.certificateService.verifyByStellarHash(
       hash,
@@ -377,8 +375,7 @@ export class CertificateController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() req: Request,
   ): Promise<unknown> {
-    const ipAddress =
-      (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
+    const ipAddress = req.ip ?? 'unknown';
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     const cert = await this.certificateService.issue(
       dto,
@@ -416,8 +413,7 @@ export class CertificateController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() req: Request,
   ): Promise<unknown> {
-    const ipAddress =
-      (req.headers['x-forwarded-for'] as string) ?? req.ip ?? 'unknown';
+    const ipAddress = req.ip ?? 'unknown';
     const userAgent = req.headers['user-agent'] ?? 'unknown';
     return this.certificateService.revokeWithUser(
       id,

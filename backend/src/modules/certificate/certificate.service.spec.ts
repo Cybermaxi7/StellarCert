@@ -21,6 +21,8 @@ describe('CertificateService', () => {
   let service: CertificateService;
   const mockQueryBuilder = {
     leftJoinAndSelect: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
@@ -388,7 +390,9 @@ describe('CertificateService', () => {
 
     beforeEach(() => {
       jest.clearAllMocks();
-      certificateRepository.save.mockImplementation(async (cert: any) => cert);
+      certificateRepository.save.mockImplementation((cert: any) =>
+        Promise.resolve(cert),
+      );
       webhooksService.triggerEvent.mockResolvedValue(undefined);
     });
 
@@ -412,7 +416,7 @@ describe('CertificateService', () => {
 
       await service.updateWithUser(
         'cert-1008',
-        { title: 'Updated title' } as any,
+        { title: 'Updated title' },
         OWNER,
         UserRole.ISSUER,
       );

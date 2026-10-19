@@ -22,6 +22,7 @@ import { IAuthTokens, IUserPublic } from '../interfaces/user.interface';
 import { EmailQueueService } from '../../email/email-queue.service';
 import { LoggingService } from '../../../common/logging/logging.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { tokenLifetimeSeconds } from '../../auth/utils/token-lifetime';
 
 @Injectable()
 export class UserAuthService {
@@ -294,7 +295,7 @@ export class UserAuthService {
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.get('JWT_EXPIRES_IN', '1h'),
+      expiresIn: this.configService.get('JWT_ACCESS_EXPIRES_IN', '15m'),
     });
 
     const refreshToken = this.jwtService.sign(payload, {
@@ -318,7 +319,7 @@ export class UserAuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 3600, // 1 hour in seconds
+      expiresIn: tokenLifetimeSeconds(accessToken),
     };
   }
 

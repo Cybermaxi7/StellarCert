@@ -16,6 +16,7 @@ import { JwtManagementService } from './services/jwt.service';
 import { TwoFactorService } from './services/two-factor.service';
 import { UserStatus } from '../users/entities/user.entity';
 import * as bcrypt from 'bcryptjs';
+import { tokenLifetimeSeconds } from './utils/token-lifetime';
 
 @Injectable()
 export class AuthService {
@@ -88,7 +89,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 3600,
+      expiresIn: tokenLifetimeSeconds(accessToken),
       user: {
         id: user.id,
         email: user.email,
@@ -173,7 +174,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 3600,
+      expiresIn: tokenLifetimeSeconds(accessToken),
       user: {
         id: user.id,
         email: user.email,
@@ -268,7 +269,7 @@ export class AuthService {
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        expiresIn: 3600,
+        expiresIn: tokenLifetimeSeconds(tokens.accessToken),
         user: {
           id: user.id,
           email: user.email,

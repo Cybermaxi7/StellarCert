@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Certificate } from '../entities/certificate.entity';
+import { PUBLIC_ISSUER_COLUMNS } from '../constants/public-issuer-columns';
 
 @Injectable()
 export class CertificateSearchService {
@@ -20,7 +21,8 @@ export class CertificateSearchService {
   ): Promise<{ certificates: Certificate[]; total: number }> {
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .orderBy('certificate.issuedAt', 'DESC');
 
     if (issuerId) {
@@ -43,7 +45,8 @@ export class CertificateSearchService {
   async findOne(id: string): Promise<Certificate> {
     const certificate = await this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.id = :id', { id })
       .getOne();
 
@@ -57,7 +60,8 @@ export class CertificateSearchService {
   async getCertificatesByRecipient(email: string): Promise<Certificate[]> {
     return this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.recipientEmail = :email', { email })
       .orderBy('certificate.issuedAt', 'DESC')
       .getMany();
@@ -66,7 +70,8 @@ export class CertificateSearchService {
   async getCertificatesByIssuer(issuerId: string): Promise<Certificate[]> {
     return this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.issuerId = :issuerId', { issuerId })
       .orderBy('certificate.issuedAt', 'DESC')
       .getMany();
@@ -75,7 +80,8 @@ export class CertificateSearchService {
   async getDuplicateCertificates(): Promise<Certificate[]> {
     return this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.isDuplicate = :isDuplicate', { isDuplicate: true })
       .orderBy('certificate.issuedAt', 'DESC')
       .getMany();
@@ -87,7 +93,8 @@ export class CertificateSearchService {
   ): Promise<Certificate[]> {
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .orderBy('certificate.issuedAt', 'DESC');
 
     if (issuerId) {
@@ -111,7 +118,8 @@ export class CertificateSearchService {
   ): Promise<Certificate[]> {
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer');
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS);
 
     // Text search across multiple fields
     if (query) {

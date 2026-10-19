@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Certificate } from '../entities/certificate.entity';
 import { Verification } from '../entities/verification.entity';
+import { PUBLIC_ISSUER_COLUMNS } from '../constants/public-issuer-columns';
 import { WebhooksService } from '../../webhooks/webhooks.service';
 import { WebhookEvent } from '../../webhooks/entities/webhook-subscription.entity';
 
@@ -21,7 +22,8 @@ export class CertificateVerificationService {
   async findByVerificationCode(verificationCode: string): Promise<Certificate> {
     const certificate = await this.certificateRepository
       .createQueryBuilder('certificate')
-      .leftJoinAndSelect('certificate.issuer', 'issuer')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.verificationCode = :verificationCode', {
         verificationCode,
       })

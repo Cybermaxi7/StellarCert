@@ -13,6 +13,20 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { migrationStrategyWarnings } from './config/typeorm.config';
 
+/**
+ * Express `trust proxy` setting from TRUST_PROXY. `true` would trust every
+ * X-Forwarded-For hop and let any client spoof `req.ip` (#1120), so the
+ * default is off. Use a hop count (e.g. `1`) or a proxy address / CIDR list.
+ */
+function parseTrustProxy(value?: string): boolean | number | string {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === 'false' || trimmed === '0') {
+    return false;
+  }
+  const hops = Number(trimmed);
+  return Number.isInteger(hops) && hops > 0 ? hops : trimmed;
+}
+
 async function bootstrap() {
   // Report configuration that contradicts the documented migration strategy
   // before anything else starts (e.g. TYPEORM_SYNCHRONIZE=true, which is no
@@ -23,7 +37,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.set('trust proxy', true);
+  expressApp.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
 
   const sentryService = app.get(SentryService);
   const loggingService = app.get(LoggingService);

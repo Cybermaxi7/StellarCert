@@ -20,6 +20,7 @@ import {
 import type { Request, Response } from 'express';
 import { CertificateService } from './certificate.service';
 import { CertificatePdfService } from './services/pdf.service';
+import { CertificateTemplateService } from './services/template.service';
 import {
   ApiTags,
   ApiOperation,
@@ -73,6 +74,7 @@ export class CertificateController {
     private readonly certificateService: CertificateService,
     private readonly statsService: CertificateStatsService,
     private readonly pdfService: CertificatePdfService,
+    private readonly templateService: CertificateTemplateService,
     private readonly mapper: CertificateMapper,
   ) {}
 
@@ -332,7 +334,12 @@ export class CertificateController {
     @Res() res: Response,
   ): Promise<void> {
     const certificate = await this.certificateService.findOne(id);
-    const buffer = await this.pdfService.generate(certificate);
+    // A stale or deactivated templateId must never break the download;
+    // findByIdForRendering returns null and the default layout is used.
+    const template = await this.templateService.findByIdForRendering(
+      certificate.templateId,
+    );
+    const buffer = await this.pdfService.generate(certificate, template);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',

@@ -6,12 +6,14 @@ import { CertificateController } from './certificate.controller';
 import { CertificateService } from './certificate.service';
 import { CertificateStatsService } from './services/stats.service';
 import { CertificatePdfService } from './services/pdf.service';
+import { CertificateTemplateService } from './services/template.service';
 import { CertificateMapper } from './mappers/certificate.mapper';
 import { UserRole } from '../../common/constants/roles';
 
 describe('CertificateController', () => {
   let controller: CertificateController;
   const certificateService = {
+    findOne: jest.fn(),
     getCertificateQrCode: jest.fn(),
     verifyCertificate: jest.fn(),
     verifyByCode: jest.fn(),
@@ -32,6 +34,12 @@ describe('CertificateController', () => {
     toResponse: jest.fn(),
     toVerificationResult: jest.fn(),
   };
+  const templateService = {
+    findByIdForRendering: jest.fn(),
+  };
+  const pdfService = {
+    generate: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -47,9 +55,11 @@ describe('CertificateController', () => {
         },
         {
           provide: CertificatePdfService,
-          useValue: {
-            generate: jest.fn(),
-          },
+          useValue: pdfService,
+        },
+        {
+          provide: CertificateTemplateService,
+          useValue: templateService,
         },
         {
           provide: CertificateMapper,
@@ -151,7 +161,14 @@ describe('CertificateController', () => {
     });
 
     it('should force non-admin issuer to their own issuerId even if another issuerId is requested', async () => {
-      await controller.findAll(1, 10, 'other-issuer-id', undefined, 'my-issuer-id', UserRole.ISSUER);
+      await controller.findAll(
+        1,
+        10,
+        'other-issuer-id',
+        undefined,
+        'my-issuer-id',
+        UserRole.ISSUER,
+      );
 
       expect(certificateService.findAll).toHaveBeenCalledWith(
         1,
@@ -162,7 +179,14 @@ describe('CertificateController', () => {
     });
 
     it('should force non-admin issuer to their own issuerId when no issuerId is requested', async () => {
-      await controller.findAll(1, 10, undefined, undefined, 'my-issuer-id', UserRole.ISSUER);
+      await controller.findAll(
+        1,
+        10,
+        undefined,
+        undefined,
+        'my-issuer-id',
+        UserRole.ISSUER,
+      );
 
       expect(certificateService.findAll).toHaveBeenCalledWith(
         1,
@@ -173,7 +197,14 @@ describe('CertificateController', () => {
     });
 
     it('should allow admin to query certificates of any issuer', async () => {
-      await controller.findAll(1, 10, 'other-issuer-id', undefined, 'admin-id', UserRole.ADMIN);
+      await controller.findAll(
+        1,
+        10,
+        'other-issuer-id',
+        undefined,
+        'admin-id',
+        UserRole.ADMIN,
+      );
 
       expect(certificateService.findAll).toHaveBeenCalledWith(
         1,
@@ -184,7 +215,14 @@ describe('CertificateController', () => {
     });
 
     it('should allow admin to query certificates across all issuers without issuerId filter', async () => {
-      await controller.findAll(1, 10, undefined, undefined, 'admin-id', UserRole.ADMIN);
+      await controller.findAll(
+        1,
+        10,
+        undefined,
+        undefined,
+        'admin-id',
+        UserRole.ADMIN,
+      );
 
       expect(certificateService.findAll).toHaveBeenCalledWith(
         1,
@@ -195,7 +233,14 @@ describe('CertificateController', () => {
     });
 
     it('should cap limit at 100 when a higher limit is requested', async () => {
-      await controller.findAll(1, 500, undefined, undefined, 'admin-id', UserRole.ADMIN);
+      await controller.findAll(
+        1,
+        500,
+        undefined,
+        undefined,
+        'admin-id',
+        UserRole.ADMIN,
+      );
 
       expect(certificateService.findAll).toHaveBeenCalledWith(
         1,
@@ -326,7 +371,9 @@ describe('CertificateController', () => {
     });
 
     beforeEach(() => {
-      certificateService.exportAllFiltered.mockResolvedValue('id,title\n1,Cert');
+      certificateService.exportAllFiltered.mockResolvedValue(
+        'id,title\n1,Cert',
+      );
     });
 
     it('should force non-admin issuer to their own issuerId', async () => {
@@ -378,7 +425,7 @@ describe('CertificateController', () => {
     });
 
     it('forwards the issuer identity and role when updating', async () => {
-      await controller.update(CERT_ID, { title: 'New' } as any, user as any);
+      await controller.update(CERT_ID, { title: 'New' }, user);
 
       expect(certificateService.updateWithUser).toHaveBeenCalledWith(
         CERT_ID,
@@ -393,8 +440,8 @@ describe('CertificateController', () => {
 
       await controller.revoke(
         CERT_ID,
-        { reason: 'policy violation' } as any,
-        user as any,
+        { reason: 'policy violation' },
+        user,
         req as any,
       );
 
@@ -411,8 +458,8 @@ describe('CertificateController', () => {
     it('forwards the freeze DTO and issuer identity to the service', async () => {
       await controller.freeze(
         CERT_ID,
-        { reason: 'compliance hold', durationDays: 3 } as any,
-        user as any,
+        { reason: 'compliance hold', durationDays: 3 },
+        user,
       );
 
       expect(certificateService.freeze).toHaveBeenCalledWith(
@@ -425,11 +472,7 @@ describe('CertificateController', () => {
     });
 
     it('forwards the unfreeze DTO and issuer identity to the service', async () => {
-      await controller.unfreeze(
-        CERT_ID,
-        { reason: 'issue resolved' } as any,
-        user as any,
-      );
+      await controller.unfreeze(CERT_ID, { reason: 'issue resolved' }, user);
 
       expect(certificateService.unfreeze).toHaveBeenCalledWith(
         CERT_ID,
@@ -461,6 +504,73 @@ describe('CertificateController', () => {
         5,
       );
       expect(result).toEqual(mockCerts);
+    });
+  });
+
+  describe('getCertificatePdf template resolution (#1180)', () => {
+    const CERT_ID = 'a3d8a582-bd23-4a2d-9630-6d4a2f5fd6f0';
+
+    beforeEach(() => {
+      certificateService.findOne.mockResolvedValue({
+        id: CERT_ID,
+        certificateId: 'CERT-2026-TEST01',
+        templateId: 'tpl-1',
+        verificationCode: 'AB12CD34',
+      });
+      pdfService.generate.mockResolvedValue(Buffer.from('%PDF-1.4'));
+      templateService.findByIdForRendering.mockReset();
+    });
+
+    it('renders with the stored template when templateId resolves', async () => {
+      const template = { id: 'tpl-1', primaryColor: '#123456' };
+      templateService.findByIdForRendering.mockResolvedValue(template);
+
+      const res = { setHeader: jest.fn(), end: jest.fn() };
+      await controller.getCertificatePdf(CERT_ID, res as any);
+
+      expect(templateService.findByIdForRendering).toHaveBeenCalledWith(
+        'tpl-1',
+      );
+      expect(pdfService.generate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: CERT_ID }),
+        template,
+      );
+      expect(res.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'application/pdf',
+      );
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('falls back to the default layout when the template is unknown or deactivated', async () => {
+      templateService.findByIdForRendering.mockResolvedValue(null);
+
+      const res = { setHeader: jest.fn(), end: jest.fn() };
+      await controller.getCertificatePdf(CERT_ID, res as any);
+
+      expect(pdfService.generate).toHaveBeenCalledWith(
+        expect.objectContaining({ id: CERT_ID }),
+        null,
+      );
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('still queries rendering when the certificate has no templateId', async () => {
+      certificateService.findOne.mockResolvedValue({
+        id: CERT_ID,
+        certificateId: 'CERT-2026-TEST02',
+        templateId: undefined,
+        verificationCode: 'CD56EF78',
+      });
+      templateService.findByIdForRendering.mockResolvedValue(null);
+
+      const res = { setHeader: jest.fn(), end: jest.fn() };
+      await controller.getCertificatePdf(CERT_ID, res as any);
+
+      expect(templateService.findByIdForRendering).toHaveBeenCalledWith(
+        undefined,
+      );
+      expect(pdfService.generate).toHaveBeenCalledWith(expect.anything(), null);
     });
   });
 });

@@ -14,10 +14,9 @@ vi.mock("../../api/endpoints", () => ({
   },
 }));
 
-// ── html5-qrcode mock (camera scanner is irrelevant to these tests) ────────
-vi.mock("html5-qrcode", () => ({
-  Html5QrcodeScanner: vi.fn(),
-}));
+// ── html5-qrcode is no longer statically imported by the page: the scanner
+// modal is lazy-loaded and only pulled in when the user opens it, so these
+// tests never touch the library.
 
 import VerifyCertificate from "../VerifyCertificate";
 

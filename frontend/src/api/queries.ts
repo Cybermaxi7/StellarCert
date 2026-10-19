@@ -142,12 +142,15 @@ export const useCertificateHistoryQuery = (certificateId: string | null) =>
 /**
  * Verifies a serial number. Keyed by serial, so re-checking the same
  * certificate is answered from cache and in-flight lookups are de-duplicated.
+ *
+ * Callers must commit the serial explicitly (form submit, QR scan or URL
+ * parameter); the query must never be driven by raw keystrokes.
  */
 export const useVerifyCertificateQuery = (serialNumber: string) =>
   useQuery({
     queryKey: queryKeys.certificates.verification(serialNumber),
     queryFn: () => certificateApi.verify(serialNumber),
-    enabled: serialNumber.trim().length > 2,
+    enabled: serialNumber.trim().length > 0,
   });
 
 // ── Templates ──────────────────────────────────────────────────────────────
@@ -438,7 +441,7 @@ export const useMarkAllNotificationsReadMutation = () => {
 
 /**
  * Explicit, user-triggered verification (the verifier dashboard's button).
- * The debounced auto-verify on the verify page uses the query above instead.
+ * The verify page commits a serial into `useVerifyCertificateQuery` instead.
  */
 export const useVerifyCertificateMutation = () => {
   const queryClient = useQueryClient();

@@ -69,6 +69,7 @@ const ResetPassword = () => {
               id="reset-password"
               type="password"
               value={password}
+              autoComplete="new-password"
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border rounded-md"
               required
@@ -80,6 +81,7 @@ const ResetPassword = () => {
               id="reset-confirm-password"
               type="password"
               value={confirm}
+              autoComplete="new-password"
               onChange={(e) => setConfirm(e.target.value)}
               className="w-full px-3 py-2 border rounded-md"
               required

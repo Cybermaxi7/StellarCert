@@ -166,6 +166,24 @@ export class CertificateController {
     return this.statsService.getPublicSummary();
   }
 
+  @Get('stats/total')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.AUDITOR)
+  @ApiOperation({ summary: 'Total certificates count' })
+  async getTotalCertificates(): Promise<{ total: number }> {
+    const summary = await this.statsService.getPublicSummary();
+    return { total: summary.totalCertificates ?? 0 };
+  }
+
+  @Get('stats/daily-verification')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.AUDITOR)
+  @ApiOperation({ summary: 'Daily verification statistics' })
+  async getDailyVerification(): Promise<{ count: number }> {
+    const stats = await this.statsService.getStatistics({});
+    return { count: stats.verificationStats?.dailyVerifications ?? 0 };
+  }
+
   @Get('stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.AUDITOR)

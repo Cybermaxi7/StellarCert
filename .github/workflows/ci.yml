@@ -91,9 +91,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
       - name: Lint frontend
-        run: npm run lint -- --max-warnings 0
+        run: npm run lint
       - name: Typecheck frontend
         run: npm run typecheck
+      - name: Check API route alignment
+        run: npm run check:api-routes
       # `npm test` maps to `vitest run` (see frontend/package.json) so the
       # 16 existing src/**/*.test.ts[x] suites are actually executed here.
       - name: Test frontend

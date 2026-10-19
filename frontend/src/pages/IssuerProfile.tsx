@@ -520,12 +520,19 @@ const IssuerProfile = () => {
             </div>
             <div className="p-6">
               {statsError && (
-                <p
+                <div
                   role="alert"
-                  className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
+                  className="mb-4 flex items-center justify-between rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
                 >
-                  {statsError}
-                </p>
+                  <span>{statsError}</span>
+                  <button
+                    type="button"
+                    onClick={() => statsQuery.refetch()}
+                    className="ml-3 rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800 hover:bg-red-200 dark:bg-red-800/40 dark:text-red-200 dark:hover:bg-red-800/60"
+                  >
+                    Retry
+                  </button>
+                </div>
               )}
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -583,13 +590,35 @@ const IssuerProfile = () => {
           </h2>
         </div>
         <div className="p-6">
+          {activityError && activities.length > 0 && (
+            <div
+              role="alert"
+              className="mb-4 flex items-center justify-between rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
+            >
+              <span>{activityError}</span>
+              <button
+                type="button"
+                onClick={() => activityQuery.refetch()}
+                className="ml-3 rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800 hover:bg-red-200 dark:bg-red-800/40 dark:text-red-200 dark:hover:bg-red-800/60"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           {activities.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-slate-400">
               <Activity className="h-12 w-12 mx-auto text-gray-300 dark:text-slate-600 mb-4" />
               {activityError ? (
-                <p role="alert" className="text-red-600 dark:text-red-400">
-                  {activityError}
-                </p>
+                <div role="alert" className="text-red-600 dark:text-red-400">
+                  <p>{activityError}</p>
+                  <button
+                    type="button"
+                    onClick={() => activityQuery.refetch()}
+                    className="mt-2 inline-flex items-center rounded bg-red-100 px-2.5 py-1 text-xs font-medium text-red-800 hover:bg-red-200 dark:bg-red-800/40 dark:text-red-200 dark:hover:bg-red-800/60"
+                  >
+                    Retry
+                  </button>
+                </div>
               ) : (
                 <p>No recent activity found</p>
               )}

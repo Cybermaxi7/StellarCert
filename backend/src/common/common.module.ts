@@ -139,6 +139,8 @@ import { DistributedLockService } from './services/distributed-lock.service';
 })
 export class CommonModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(CorrelationIdMiddleware, MetricsMiddleware).forRoutes('{*path}');
+    consumer
+      .apply(CorrelationIdMiddleware, MetricsMiddleware)
+      .forRoutes('{*path}');
   }
 }

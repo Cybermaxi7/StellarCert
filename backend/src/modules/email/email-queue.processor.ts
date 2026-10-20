@@ -26,46 +26,36 @@ export class EmailQueueProcessor {
 
   @Process(EmailJobType.SEND_EMAIL)
   async processSendEmail(job: Job<SendEmailDto>): Promise<void> {
-    await this.processJob(
-      job,
-      'email',
-      () => this.emailService.sendEmail(job.data),
+    await this.processJob(job, 'email', () =>
+      this.emailService.sendEmail(job.data),
     );
   }
 
   @Process(EmailJobType.SEND_CERTIFICATE_ISSUED)
   async processCertificateIssued(job: Job): Promise<void> {
-    await this.processJob(
-      job,
-      'certificate issued email',
-      () => this.emailService.sendCertificateIssued(job.data),
+    await this.processJob(job, 'certificate issued email', () =>
+      this.emailService.sendCertificateIssued(job.data),
     );
   }
 
   @Process(EmailJobType.SEND_VERIFICATION)
   async processVerificationEmail(job: Job): Promise<void> {
-    await this.processJob(
-      job,
-      'verification email',
-      () => this.emailService.sendVerificationEmail(job.data),
+    await this.processJob(job, 'verification email', () =>
+      this.emailService.sendVerificationEmail(job.data),
     );
   }
 
   @Process(EmailJobType.SEND_PASSWORD_RESET)
   async processPasswordReset(job: Job): Promise<void> {
-    await this.processJob(
-      job,
-      'password reset email',
-      () => this.emailService.sendPasswordReset(job.data),
+    await this.processJob(job, 'password reset email', () =>
+      this.emailService.sendPasswordReset(job.data),
     );
   }
 
   @Process(EmailJobType.SEND_REVOCATION)
   async processRevocationNotice(job: Job): Promise<void> {
-    await this.processJob(
-      job,
-      'revocation notice',
-      () => this.emailService.sendRevocationNotice(job.data),
+    await this.processJob(job, 'revocation notice', () =>
+      this.emailService.sendRevocationNotice(job.data),
     );
   }
 
@@ -80,19 +70,14 @@ export class EmailQueueProcessor {
     description: string,
     handler: () => Promise<void>,
   ): Promise<void> {
-    this.logger.log(
-      `Processing ${description} job ${job.id}`,
-    );
+    this.logger.log(`Processing ${description} job ${job.id}`);
 
     try {
       await handler();
 
-      this.logger.log(
-        `${description} job ${job.id} completed successfully`,
-      );
+      this.logger.log(`${description} job ${job.id} completed successfully`);
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
 
       this.logger.error(
         `${description} job ${job.id} failed: ${message}`,

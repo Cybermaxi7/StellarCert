@@ -12,12 +12,16 @@ describe('profile-picture.util', () => {
   });
 
   it('builds a key that ignores whatever file name the client sent', () => {
-    expect(profilePictureKey('u1', 'image/webp', 42)).toBe('profile-pictures/u1-42.webp');
+    expect(profilePictureKey('u1', 'image/webp', 42)).toBe(
+      'profile-pictures/u1-42.webp',
+    );
     expect(() => profilePictureKey('u1', 'application/x-sh', 1)).toThrow();
   });
 
   it('keeps stored keys as they are', () => {
-    expect(storageKeyFor('profile-pictures/u1-42.png')).toBe('profile-pictures/u1-42.png');
+    expect(storageKeyFor('profile-pictures/u1-42.png')).toBe(
+      'profile-pictures/u1-42.png',
+    );
     expect(storageKeyFor(null)).toBeNull();
     expect(storageKeyFor('')).toBeNull();
   });

@@ -5,9 +5,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * #1145 index certificates.expiresAt
  * #1184 auth_sessions table + users.tokenVersion
  */
-export class AuditTimestampCertExpiryAndSessions1784000000000
-  implements MigrationInterface
-{
+export class AuditTimestampCertExpiryAndSessions1784000000000 implements MigrationInterface {
   name = 'AuditTimestampCertExpiryAndSessions1784000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

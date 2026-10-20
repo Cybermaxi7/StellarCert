@@ -10,20 +10,20 @@ function fakeRedis() {
       clock += ms;
     },
     counters,
-    eval: jest.fn(async (_script: string, _n: number, key: string, ttl: string) => {
+    eval: jest.fn((_script: string, _n: number, key: string, ttl: string) => {
       let entry = counters.get(key);
       if (!entry || entry.expiresAt <= clock) {
         entry = { count: 0, expiresAt: clock + Number(ttl) };
         counters.set(key, entry);
       }
       entry.count += 1;
-      return [entry.count, entry.expiresAt - clock];
+      return Promise.resolve([entry.count, entry.expiresAt - clock]);
     }),
-    del: jest.fn(async (key: string) => {
+    del: jest.fn((key: string) => {
       counters.delete(key);
-      return 1;
+      return Promise.resolve(1);
     }),
-    quit: jest.fn(async () => 'OK'),
+    quit: jest.fn().mockResolvedValue('OK'),
   };
 }
 
@@ -92,14 +92,20 @@ describe('resolveRedisUrl', () => {
 
   it('prefers REDIS_URL', () => {
     expect(
-      resolveRedisUrl(lookup({ REDIS_URL: 'redis://cache:6379', REDIS_HOST: 'x' })),
+      resolveRedisUrl(
+        lookup({ REDIS_URL: 'redis://cache:6379', REDIS_HOST: 'x' }),
+      ),
     ).toBe('redis://cache:6379');
   });
 
   it('builds a URL from REDIS_HOST, port and password', () => {
     expect(
       resolveRedisUrl(
-        lookup({ REDIS_HOST: 'redis', REDIS_PORT: '6380', REDIS_PASSWORD: 'p@ss' }),
+        lookup({
+          REDIS_HOST: 'redis',
+          REDIS_PORT: '6380',
+          REDIS_PASSWORD: 'p@ss',
+        }),
       ),
     ).toBe('redis://:p%40ss@redis:6380');
   });

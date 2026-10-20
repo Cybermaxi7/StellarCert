@@ -243,10 +243,7 @@ export class AuthController {
   /** #1184 — list active sessions for the current user */
   @Get('sessions')
   @UseGuards(JwtAuthGuard)
-  async listSessions(
-    @CurrentUser('id') userId: string,
-    @Req() req: Request,
-  ) {
+  async listSessions(@CurrentUser('id') userId: string, @Req() req: Request) {
     const currentRefresh = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     return this.sessionsService.listForUser(userId, currentRefresh);
   }

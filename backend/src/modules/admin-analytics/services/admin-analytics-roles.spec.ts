@@ -10,21 +10,32 @@ import { CertificateStatsService } from '../../certificate/services/stats.servic
 
 function builder(rows: unknown[]) {
   const qb: Record<string, jest.Mock> = {};
-  for (const m of ['select', 'addSelect', 'where', 'andWhere', 'groupBy', 'orderBy', 'leftJoinAndSelect']) {
+  for (const m of [
+    'select',
+    'addSelect',
+    'where',
+    'andWhere',
+    'groupBy',
+    'orderBy',
+    'leftJoinAndSelect',
+  ]) {
     qb[m] = jest.fn(() => qb);
   }
-  qb.getRawMany = jest.fn(async () => rows);
-  qb.getCount = jest.fn(async () => 0);
+  qb.getRawMany = jest.fn().mockResolvedValue(rows);
+  qb.getCount = jest.fn().mockResolvedValue(0);
   return qb;
 }
 
 describe('AdminAnalyticsService users by role', () => {
   async function build(roleRows: unknown[]) {
     const userRepo = {
-      count: jest.fn(async () => 0),
+      count: jest.fn().mockResolvedValue(0),
       createQueryBuilder: jest.fn(() => builder(roleRows)),
     };
-    const otherRepo = () => ({ count: jest.fn(async () => 0), createQueryBuilder: jest.fn(() => builder([])) });
+    const otherRepo = () => ({
+      count: jest.fn().mockResolvedValue(0),
+      createQueryBuilder: jest.fn(() => builder([])),
+    });
     const module = await Test.createTestingModule({
       providers: [
         AdminAnalyticsService,
@@ -32,8 +43,14 @@ describe('AdminAnalyticsService users by role', () => {
         { provide: getRepositoryToken(Certificate), useValue: otherRepo() },
         { provide: getRepositoryToken(Verification), useValue: otherRepo() },
         { provide: getRepositoryToken(Issuer), useValue: otherRepo() },
-        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn() } },
-        { provide: CertificateStatsService, useValue: { getTopIssuersData: jest.fn(async () => []) } },
+        {
+          provide: CACHE_MANAGER,
+          useValue: { get: jest.fn(), set: jest.fn() },
+        },
+        {
+          provide: CertificateStatsService,
+          useValue: { getTopIssuersData: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
     return module.get(AdminAnalyticsService);

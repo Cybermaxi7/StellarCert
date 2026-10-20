@@ -245,7 +245,9 @@ export class MultisigController {
 
   @Get('config/:issuer')
   @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.USER)
-  async getMultisigConfig(@Param('issuer') issuer: string): Promise<MultisigConfig> {
+  async getMultisigConfig(
+    @Param('issuer') issuer: string,
+  ): Promise<MultisigConfig> {
     try {
       const config = await this.multisigService.getMultisigConfig(issuer);
       return config;
@@ -263,7 +265,9 @@ export class MultisigController {
 
   @Get('request/:requestId')
   @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.USER)
-  async getPendingRequest(@Param('requestId') requestId: string): Promise<PendingRequest> {
+  async getPendingRequest(
+    @Param('requestId') requestId: string,
+  ): Promise<PendingRequest> {
     try {
       const request = await this.multisigService.getPendingRequest(requestId);
       return request;

@@ -34,7 +34,10 @@ describe('build and runtime paths', () => {
     expect(emailTemplates).toBeDefined();
     expect(
       existsSync(
-        join(backendRoot, 'src/modules/email/templates/transfer-confirmation.hbs'),
+        join(
+          backendRoot,
+          'src/modules/email/templates/transfer-confirmation.hbs',
+        ),
       ),
     ).toBe(true);
   });

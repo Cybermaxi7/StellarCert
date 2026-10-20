@@ -197,7 +197,13 @@ export class WebhooksService {
     issuerId: string,
     page: number = 1,
     limit: number = 50,
-  ): Promise<{ data: WebhookLog[]; total: number; page: number; limit: number; totalPages: number }> {
+  ): Promise<{
+    data: WebhookLog[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     await this.findOne(subscriptionId, issuerId);
 
     const [data, total] = await this.logRepository.findAndCount({

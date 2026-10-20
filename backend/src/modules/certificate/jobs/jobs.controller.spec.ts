@@ -16,9 +16,7 @@ describe('JobsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [JobsController],
-      providers: [
-        { provide: JobsService, useValue: mockJobsService },
-      ],
+      providers: [{ provide: JobsService, useValue: mockJobsService }],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: jest.fn(() => true) })
@@ -36,8 +34,12 @@ describe('JobsController', () => {
 
   it('should restrict access with JwtAuthGuard and RolesGuard', () => {
     const guards = Reflect.getMetadata('__guards__', controller.enqueueEmail);
-    const hasJwtGuard = guards.some((guard: any) => guard.name === 'JwtAuthGuard' || guard === JwtAuthGuard);
-    const hasRolesGuard = guards.some((guard: any) => guard.name === 'RolesGuard' || guard === RolesGuard);
+    const hasJwtGuard = guards.some(
+      (guard: any) => guard.name === 'JwtAuthGuard' || guard === JwtAuthGuard,
+    );
+    const hasRolesGuard = guards.some(
+      (guard: any) => guard.name === 'RolesGuard' || guard === RolesGuard,
+    );
 
     expect(hasJwtGuard).toBe(true);
     expect(hasRolesGuard).toBe(true);

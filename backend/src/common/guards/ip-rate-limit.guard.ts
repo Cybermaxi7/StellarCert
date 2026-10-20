@@ -48,7 +48,11 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   private readonly entries = new Map<string, RateLimitEntry>();
   private lastSweep = 0;
 
-  async consume(key: string, windowMs: number, now: number): Promise<RateLimitEntry> {
+  async consume(
+    key: string,
+    windowMs: number,
+    now: number,
+  ): Promise<RateLimitEntry> {
     // Drop expired counters now and then so the map cannot grow without bound.
     if (now - this.lastSweep >= InMemoryRateLimitStore.SWEEP_INTERVAL_MS) {
       this.lastSweep = now;
@@ -67,14 +71,16 @@ export class InMemoryRateLimitStore implements RateLimitStore {
     return { ...entry };
   }
 
-  async reset(key: string): Promise<void> {
+  reset(key: string): Promise<void> {
     this.entries.delete(key);
+    return Promise.resolve();
   }
 
-  async prune(now: number): Promise<void> {
+  prune(now: number): Promise<void> {
     for (const [key, entry] of this.entries.entries()) {
       if (now > entry.resetTime) this.entries.delete(key);
     }
+    return Promise.resolve();
   }
 }
 

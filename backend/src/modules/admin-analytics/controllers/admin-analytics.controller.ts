@@ -32,9 +32,7 @@ import { UserRole } from '../../users/entities/user.entity';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class AdminAnalyticsController {
-  constructor(
-    private readonly analyticsService: AdminAnalyticsService,
-  ) {}
+  constructor(private readonly analyticsService: AdminAnalyticsService) {}
 
   /**
    * Retrieves platform-wide analytics for the admin dashboard.

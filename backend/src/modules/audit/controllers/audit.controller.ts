@@ -176,8 +176,7 @@ export class AuditController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get user audit actions',
-    description:
-      'Retrieves audit actions associated with a specific user.',
+    description: 'Retrieves audit actions associated with a specific user.',
   })
   @ApiParam({
     name: 'userId',

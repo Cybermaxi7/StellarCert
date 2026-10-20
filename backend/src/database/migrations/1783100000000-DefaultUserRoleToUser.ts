@@ -9,10 +9,14 @@ export class DefaultUserRoleToUser1783100000000 implements MigrationInterface {
   name = 'DefaultUserRoleToUser1783100000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'user'`);
+    await queryRunner.query(
+      `ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'user'`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'issuer'`);
+    await queryRunner.query(
+      `ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'issuer'`,
+    );
   }
 }

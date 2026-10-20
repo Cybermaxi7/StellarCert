@@ -13,10 +13,7 @@ import { AuditCleanupJob } from './jobs';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([AuditLog]),
-    forwardRef(() => AuthModule),
-  ],
+  imports: [TypeOrmModule.forFeature([AuditLog]), forwardRef(() => AuthModule)],
   controllers: [AuditController],
   providers: [AuditService, RequestContextService, AuditCleanupJob],
   exports: [AuditService, RequestContextService],

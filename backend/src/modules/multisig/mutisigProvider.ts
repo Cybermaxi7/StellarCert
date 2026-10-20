@@ -13,15 +13,7 @@ export enum SignatureAction {
   Reject = 1,
 }
 
-
- @Injectable()
- export class MultisigProveider{
-
-
-    async MultiSigProvider () {
-        
-    }
-
-
-
- }
+@Injectable()
+export class MultisigProveider {
+  async MultiSigProvider() {}
+}

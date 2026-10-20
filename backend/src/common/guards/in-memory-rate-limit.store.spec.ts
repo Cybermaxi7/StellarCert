@@ -14,11 +14,15 @@ describe('InMemoryRateLimitStore', () => {
     for (let i = 0; i < 1_000; i += 1) {
       await store.consume(`ip-${i}`, 1_000, 0);
     }
-    expect((store as unknown as { entries: Map<string, unknown> }).entries.size).toBe(1_000);
+    expect(
+      (store as unknown as { entries: Map<string, unknown> }).entries.size,
+    ).toBe(1_000);
 
     // A request after the sweep interval drops everything that has expired.
     await store.consume('fresh', 1_000, 120_000);
 
-    expect((store as unknown as { entries: Map<string, unknown> }).entries.size).toBe(1);
+    expect(
+      (store as unknown as { entries: Map<string, unknown> }).entries.size,
+    ).toBe(1);
   });
 });

@@ -335,7 +335,11 @@ describe('JobsProcessor - email and pdf handlers (upstream coverage)', () => {
   });
 
   it('should call EmailService on send-email', async () => {
-    const jobData = { recipientEmail: 'test@example.com', subject: 'Test', metadata: {} };
+    const jobData = {
+      recipientEmail: 'test@example.com',
+      subject: 'Test',
+      metadata: {},
+    };
     await processor.handleEmail({ data: jobData } as any);
     expect(emailService.sendEmail).toHaveBeenCalledWith({
       to: 'test@example.com',

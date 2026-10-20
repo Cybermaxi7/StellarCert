@@ -14,24 +14,33 @@ describe('UsersController profile pictures', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    controller = new UsersController(usersService as never, storageService as never);
+    controller = new UsersController(
+      usersService as never,
+      storageService as never,
+    );
   });
 
   it('signs a fresh URL from the stored key whenever the profile is read', async () => {
     usersService.getProfile.mockResolvedValue({ ...user });
-    storageService.getSignedUrl.mockResolvedValue('https://signed.example/pic?sig=new');
+    storageService.getSignedUrl.mockResolvedValue(
+      'https://signed.example/pic?sig=new',
+    );
 
     const profile = await controller.getProfile('u1');
 
-    expect(storageService.getSignedUrl).toHaveBeenCalledWith('profile-pictures/u1-1.png');
+    expect(storageService.getSignedUrl).toHaveBeenCalledWith(
+      'profile-pictures/u1-1.png',
+    );
     expect(profile.profilePicture).toBe('https://signed.example/pic?sig=new');
   });
 
   it('stores the object key, not the signed URL, after an upload', async () => {
-    storageService.uploadFile.mockImplementation(async (_b, _n, _m, key: string) => ({
-      key,
-      url: `https://signed.example/${key}?sig=1`,
-    }));
+    storageService.uploadFile.mockImplementation((_b, _n, _m, key: string) =>
+      Promise.resolve({
+        key,
+        url: `https://signed.example/${key}?sig=1`,
+      }),
+    );
     usersService.updateProfile.mockResolvedValue({});
 
     const result = await controller.uploadProfilePicture('u1', {
@@ -49,7 +58,9 @@ describe('UsersController profile pictures', () => {
 
   it('leaves the profile usable when storage cannot sign a URL', async () => {
     usersService.getProfile.mockResolvedValue({ ...user });
-    storageService.getSignedUrl.mockRejectedValue(new Error('Storage service is not configured'));
+    storageService.getSignedUrl.mockRejectedValue(
+      new Error('Storage service is not configured'),
+    );
 
     const profile = await controller.getProfile('u1');
 

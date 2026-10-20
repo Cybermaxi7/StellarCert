@@ -39,6 +39,8 @@ describe('RequestValidationPipe', () => {
     const pipe = new RequestValidationPipe();
     const value = 'a\nb\tc\u0001';
 
-    expect(await pipe.transform(value, { type: 'body', metatype: undefined })).toBe(value);
+    expect(
+      await pipe.transform(value, { type: 'body', metatype: undefined }),
+    ).toBe(value);
   });
 });

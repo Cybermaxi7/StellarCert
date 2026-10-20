@@ -30,13 +30,13 @@ describe('ContractEventIndexerService', () => {
   let cert: any;
   const certificateRepository = {
     findOne: jest.fn(),
-    save: jest.fn(async (c) => c),
+    save: jest.fn((c) => Promise.resolve(c)),
   };
   const transferRepository = { update: jest.fn() };
   const cursorRepository = {
     findOne: jest.fn(),
     create: jest.fn((v) => v),
-    save: jest.fn(async (v) => v),
+    save: jest.fn((v) => Promise.resolve(v)),
   };
   const sorobanService = {
     isConfigured: jest.fn().mockReturnValue(true),

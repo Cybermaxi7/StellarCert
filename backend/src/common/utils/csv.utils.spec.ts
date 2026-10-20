@@ -49,7 +49,13 @@ describe('csv.utils', () => {
 
   describe('toCsv', () => {
     it('emits a header row and data rows with newline separators', () => {
-      const csv = toCsv(['Name', 'Note'], [['Doe, Jane', '=1+1'], ['Smith', 'ok']]);
+      const csv = toCsv(
+        ['Name', 'Note'],
+        [
+          ['Doe, Jane', '=1+1'],
+          ['Smith', 'ok'],
+        ],
+      );
       expect(csv).toBe(
         ['"Name","Note"', '"Doe, Jane","\'=1+1"', '"Smith","ok"'].join('\n'),
       );

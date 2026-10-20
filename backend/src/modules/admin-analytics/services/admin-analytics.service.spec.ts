@@ -25,9 +25,9 @@ function queryBuilderStub() {
   ]) {
     qb[method] = jest.fn(() => qb);
   }
-  qb.getRawMany = jest.fn(async () => []);
-  qb.getCount = jest.fn(async () => 0);
-  qb.getOne = jest.fn(async () => null);
+  qb.getRawMany = jest.fn().mockResolvedValue([]);
+  qb.getCount = jest.fn().mockResolvedValue(0);
+  qb.getOne = jest.fn().mockResolvedValue(null);
   return qb;
 }
 
@@ -39,13 +39,13 @@ describe('AdminAnalyticsService cache TTL unit (#731)', () => {
     del: jest.fn(),
   };
   const certificateStatsService = {
-    getTopIssuersData: jest.fn(async () => []),
+    getTopIssuersData: jest.fn().mockResolvedValue([]),
   };
 
   let service: AdminAnalyticsService;
 
   const repositoryStub = () => ({
-    count: jest.fn(async () => 0),
+    count: jest.fn().mockResolvedValue(0),
     createQueryBuilder: jest.fn(() => queryBuilderStub()),
   });
 
@@ -57,7 +57,10 @@ describe('AdminAnalyticsService cache TTL unit (#731)', () => {
       providers: [
         AdminAnalyticsService,
         { provide: getRepositoryToken(User), useValue: repositoryStub() },
-        { provide: getRepositoryToken(Certificate), useValue: repositoryStub() },
+        {
+          provide: getRepositoryToken(Certificate),
+          useValue: repositoryStub(),
+        },
         {
           provide: getRepositoryToken(Verification),
           useValue: repositoryStub(),

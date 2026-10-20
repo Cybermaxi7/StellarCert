@@ -74,8 +74,12 @@ export class WebhooksProcessor {
         maxRedirects: 0,
       });
 
-      const responseBody = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-      const truncatedResponse = responseBody && responseBody.length > 2048 ? responseBody.substring(0, 2048) : responseBody;
+      const responseBody =
+        typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+      const truncatedResponse =
+        responseBody && responseBody.length > 2048
+          ? responseBody.substring(0, 2048)
+          : responseBody;
 
       await this.logRepository.save({
         subscriptionId,
@@ -86,8 +90,15 @@ export class WebhooksProcessor {
         isSuccess: true,
       });
     } catch (err) {
-      const errResponse = err?.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
-      const truncatedErrResponse = errResponse && errResponse.length > 2048 ? errResponse.substring(0, 2048) : errResponse;
+      const errResponse = err?.response?.data
+        ? typeof err.response.data === 'string'
+          ? err.response.data
+          : JSON.stringify(err.response.data)
+        : err.message;
+      const truncatedErrResponse =
+        errResponse && errResponse.length > 2048
+          ? errResponse.substring(0, 2048)
+          : errResponse;
 
       await this.logRepository.save({
         subscriptionId,

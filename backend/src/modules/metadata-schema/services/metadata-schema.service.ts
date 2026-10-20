@@ -41,7 +41,9 @@ export function assertSafePattern(fieldName: string, pattern: string): RegExp {
   try {
     return new RegExp(pattern);
   } catch {
-    throw new BadRequestException(`Pattern for field "${fieldName}" is not a valid regular expression`);
+    throw new BadRequestException(
+      `Pattern for field "${fieldName}" is not a valid regular expression`,
+    );
   }
 }
 
@@ -54,7 +56,9 @@ export class MetadataSchemaService {
   ) {}
 
   async create(dto: CreateMetadataSchemaDto): Promise<MetadataSchema> {
-    dto.fields?.forEach((f) => f.pattern && assertSafePattern(f.name, f.pattern));
+    dto.fields?.forEach(
+      (f) => f.pattern && assertSafePattern(f.name, f.pattern),
+    );
     const existing = await this.schemaRepository.findOne({
       where: { name: dto.name, version: dto.version },
     });
@@ -127,7 +131,9 @@ export class MetadataSchemaService {
         'name and version cannot be changed; create a new version with upgradeSchema instead',
       );
     }
-    dto.fields?.forEach((f) => f.pattern && assertSafePattern(f.name, f.pattern));
+    dto.fields?.forEach(
+      (f) => f.pattern && assertSafePattern(f.name, f.pattern),
+    );
 
     Object.assign(schema, dto);
 

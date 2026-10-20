@@ -54,7 +54,13 @@ import { AuthRateLimitMiddleware } from './middleware/auth-rate-limit.middleware
     SessionsService,
     AuthRateLimitMiddleware,
   ],
-  exports: [AuthService, JwtModule, JwtManagementService, TwoFactorService, SessionsService],
+  exports: [
+    AuthService,
+    JwtModule,
+    JwtManagementService,
+    TwoFactorService,
+    SessionsService,
+  ],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

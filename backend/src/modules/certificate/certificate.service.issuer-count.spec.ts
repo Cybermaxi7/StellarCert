@@ -6,12 +6,14 @@ import { Issuer } from '../issuers/entities/issuer.entity';
 function build() {
   const manager = {
     create: jest.fn((_entity: unknown, data: object) => ({ ...data })),
-    save: jest.fn(async (entity: object) => ({
-      id: 'cert-1',
-      issuerId: (entity as { issuerId?: string }).issuerId,
-      ...entity,
-    })),
-    increment: jest.fn(async () => undefined),
+    save: jest.fn((entity: object) =>
+      Promise.resolve({
+        id: 'cert-1',
+        issuerId: (entity as { issuerId?: string }).issuerId,
+        ...entity,
+      }),
+    ),
+    increment: jest.fn().mockResolvedValue(undefined),
   };
   const queryRunner = {
     connect: jest.fn(),
@@ -31,10 +33,17 @@ function build() {
     {} as never,
     { createQueryRunner: () => queryRunner } as unknown as DataSource,
     { isConfigured: () => false } as never,
-    { get: (key: string) => (key === 'STELLAR_ANCHORING_ENABLED' ? 'false' : undefined) } as unknown as ConfigService,
+    {
+      get: (key: string) =>
+        key === 'STELLAR_ANCHORING_ENABLED' ? 'false' : undefined,
+    } as unknown as ConfigService,
   );
-  jest.spyOn(service as never, 'generateCertificateId').mockResolvedValue('CERT-1' as never);
-  jest.spyOn(service as never, 'generateVerificationCode').mockResolvedValue('CODE1234' as never);
+  jest
+    .spyOn(service as never, 'generateCertificateId')
+    .mockResolvedValue('CERT-1' as never);
+  jest
+    .spyOn(service as never, 'generateVerificationCode')
+    .mockResolvedValue('CODE1234' as never);
   return { service, manager, queryRunner };
 }
 

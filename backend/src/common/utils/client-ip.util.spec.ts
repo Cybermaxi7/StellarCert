@@ -43,7 +43,9 @@ describe('client-ip.util', () => {
 
     it('takes the first non-proxy address from the right behind trusted proxies', () => {
       const ip = resolveClientIp(
-        req('10.0.0.1', { 'x-forwarded-for': '6.6.6.6, 198.51.100.4, 10.0.0.2' }),
+        req('10.0.0.1', {
+          'x-forwarded-for': '6.6.6.6, 198.51.100.4, 10.0.0.2',
+        }),
         trusted,
       );
       expect(ip).toBe('198.51.100.4');
@@ -59,7 +61,10 @@ describe('client-ip.util', () => {
 
     it('falls back to X-Real-IP, then the peer, behind a trusted proxy', () => {
       expect(
-        resolveClientIp(req('10.0.0.1', { 'x-real-ip': '198.51.100.7' }), trusted),
+        resolveClientIp(
+          req('10.0.0.1', { 'x-real-ip': '198.51.100.7' }),
+          trusted,
+        ),
       ).toBe('198.51.100.7');
       expect(resolveClientIp(req('10.0.0.1'), trusted)).toBe('10.0.0.1');
     });

@@ -8,7 +8,10 @@ import { Repository, ILike } from 'typeorm';
 import { Issuer } from './entities/issuer.entity';
 import { CreateIssuerDto } from './dto/create-issuer.dto';
 import { isValidStellarPublicKey } from './utils/stellar';
-import { IssuerPaginationQueryDto, IPaginatedResult } from './dto/pagination.dto';
+import {
+  IssuerPaginationQueryDto,
+  IPaginatedResult,
+} from './dto/pagination.dto';
 import { IssuerTier } from '../../common/rate-limiting/rate-limit.types';
 
 @Injectable()
@@ -32,8 +35,18 @@ export class IssuersService {
     return this.issuerRepo.remove(issuer);
   }
 
-  async listIssuers(query: IssuerPaginationQueryDto): Promise<IPaginatedResult<Issuer>> {
-    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'DESC', isActive, search, tier } = query;
+  async listIssuers(
+    query: IssuerPaginationQueryDto,
+  ): Promise<IPaginatedResult<Issuer>> {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      isActive,
+      search,
+      tier,
+    } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.issuerRepo.createQueryBuilder('issuer');
@@ -50,10 +63,19 @@ export class IssuersService {
     }
 
     if (tier) {
-      queryBuilder.andWhere('issuer.tier = :tier', { tier: tier as IssuerTier });
+      queryBuilder.andWhere('issuer.tier = :tier', {
+        tier: tier,
+      });
     }
 
-    const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'stellarPublicKey', 'tier', 'certificateCount'];
+    const allowedSortFields = [
+      'createdAt',
+      'updatedAt',
+      'name',
+      'stellarPublicKey',
+      'tier',
+      'certificateCount',
+    ];
     const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
     queryBuilder.orderBy(`issuer.${sortField}`, sortOrder);
 

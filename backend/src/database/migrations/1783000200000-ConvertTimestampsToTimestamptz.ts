@@ -29,11 +29,7 @@ export class ConvertTimestampsToTimestamptz1783000200000 implements MigrationInt
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await this.convert(
-      queryRunner,
-      'timestamp with time zone',
-      'timestamp',
-    );
+    await this.convert(queryRunner, 'timestamp with time zone', 'timestamp');
   }
 
   private async convert(

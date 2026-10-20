@@ -24,7 +24,9 @@ const FORMULA_TRIGGERS = ['=', '+', '-', '@', '\t', '\r'] as const;
  */
 export function escapeCsvCell(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value);
-  const neutralised = FORMULA_TRIGGERS.some((trigger) => text.startsWith(trigger))
+  const neutralised = FORMULA_TRIGGERS.some((trigger) =>
+    text.startsWith(trigger),
+  )
     ? `'${text}`
     : text;
   return `"${neutralised.replace(/"/g, '""')}"`;

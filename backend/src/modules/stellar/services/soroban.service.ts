@@ -590,23 +590,21 @@ export class SorobanService implements OnModuleInit {
 
     const response = await this.server.getEvents(request);
     return {
-      events: (response.events ?? []).map(
-        (e: any): RawContractEvent => ({
-          id: e.id,
-          pagingToken: e.pagingToken ?? e.id,
-          ledger: e.ledger,
-          txHash: e.txHash,
-          contractId: e.contractId ? String(e.contractId) : '',
-          inSuccessfulContractCall: e.inSuccessfulContractCall !== false,
-          topic: (e.topic ?? []).map((t: any) =>
-            typeof t === 'string' ? xdr.ScVal.fromXDR(t, 'base64') : t,
-          ),
-          value:
-            typeof e.value === 'string'
-              ? xdr.ScVal.fromXDR(e.value, 'base64')
-              : e.value,
-        }),
-      ),
+      events: (response.events ?? []).map((e: any): RawContractEvent => ({
+        id: e.id,
+        pagingToken: e.pagingToken ?? e.id,
+        ledger: e.ledger,
+        txHash: e.txHash,
+        contractId: e.contractId ? String(e.contractId) : '',
+        inSuccessfulContractCall: e.inSuccessfulContractCall !== false,
+        topic: (e.topic ?? []).map((t: any) =>
+          typeof t === 'string' ? xdr.ScVal.fromXDR(t, 'base64') : t,
+        ),
+        value:
+          typeof e.value === 'string'
+            ? xdr.ScVal.fromXDR(e.value, 'base64')
+            : e.value,
+      })),
       cursor: response.cursor,
       latestLedger: response.latestLedger,
     };

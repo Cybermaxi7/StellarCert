@@ -19,16 +19,24 @@ function context(
     socket: { remoteAddress: peer },
   };
   const ctx = {
-    switchToHttp: () => ({ getRequest: () => request, getResponse: () => response }),
+    switchToHttp: () => ({
+      getRequest: () => request,
+      getResponse: () => response,
+    }),
     getHandler: () => undefined,
     getClass: () => undefined,
   } as unknown as ExecutionContext;
   return { ctx, response };
 }
 
-function makeGuard(env: Record<string, string | number>, store?: InMemoryRateLimitStore) {
+function makeGuard(
+  env: Record<string, string | number>,
+  store?: InMemoryRateLimitStore,
+) {
   const config = { get: (key: string) => env[key] } as unknown as ConfigService;
-  const reflector = { getAllAndOverride: () => undefined } as unknown as Reflector;
+  const reflector = {
+    getAllAndOverride: () => undefined,
+  } as unknown as Reflector;
   const logging = { warn: jest.fn() };
   const apiKeys = { resolveIssuer: jest.fn(), consume: jest.fn() };
   return new RateLimitGuard(
@@ -42,7 +50,10 @@ function makeGuard(env: Record<string, string | number>, store?: InMemoryRateLim
 
 describe('RateLimitGuard (app-wide)', () => {
   it('blocks after the limit using the shared store', async () => {
-    const guard = makeGuard({ RATE_LIMIT_DEFAULT_MAX_REQUESTS: 2 }, new InMemoryRateLimitStore());
+    const guard = makeGuard(
+      { RATE_LIMIT_DEFAULT_MAX_REQUESTS: 2 },
+      new InMemoryRateLimitStore(),
+    );
     const { ctx } = context('203.0.113.1');
 
     await guard.canActivate(ctx);
@@ -62,11 +73,18 @@ describe('RateLimitGuard (app-wide)', () => {
   });
 
   it('cannot be bypassed by a spoofed X-Forwarded-For header', async () => {
-    const guard = makeGuard({ RATE_LIMIT_DEFAULT_MAX_REQUESTS: 1 }, new InMemoryRateLimitStore());
+    const guard = makeGuard(
+      { RATE_LIMIT_DEFAULT_MAX_REQUESTS: 1 },
+      new InMemoryRateLimitStore(),
+    );
 
-    await guard.canActivate(context('203.0.113.1', { 'x-forwarded-for': '1.1.1.1' }).ctx);
+    await guard.canActivate(
+      context('203.0.113.1', { 'x-forwarded-for': '1.1.1.1' }).ctx,
+    );
     await expect(
-      guard.canActivate(context('203.0.113.1', { 'x-forwarded-for': '2.2.2.2' }).ctx),
+      guard.canActivate(
+        context('203.0.113.1', { 'x-forwarded-for': '2.2.2.2' }).ctx,
+      ),
     ).rejects.toBeInstanceOf(HttpException);
   });
 
@@ -76,13 +94,19 @@ describe('RateLimitGuard (app-wide)', () => {
       new InMemoryRateLimitStore(),
     );
 
-    await guard.canActivate(context('10.0.0.1', { 'x-forwarded-for': '198.51.100.4' }).ctx);
+    await guard.canActivate(
+      context('10.0.0.1', { 'x-forwarded-for': '198.51.100.4' }).ctx,
+    );
     // A different client behind the same proxy has its own bucket.
     await expect(
-      guard.canActivate(context('10.0.0.1', { 'x-forwarded-for': '198.51.100.5' }).ctx),
+      guard.canActivate(
+        context('10.0.0.1', { 'x-forwarded-for': '198.51.100.5' }).ctx,
+      ),
     ).resolves.toBe(true);
     await expect(
-      guard.canActivate(context('10.0.0.1', { 'x-forwarded-for': '198.51.100.4' }).ctx),
+      guard.canActivate(
+        context('10.0.0.1', { 'x-forwarded-for': '198.51.100.4' }).ctx,
+      ),
     ).rejects.toBeInstanceOf(HttpException);
   });
 });

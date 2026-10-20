@@ -231,14 +231,55 @@ export class UserRepository {
   }
 
   async resetLoginAttempts(id: string): Promise<void> {
+    // `null`, never `undefined`: TypeORM silently skips undefined values in
+    // update(), so the lock would never actually be cleared.
     await this.repository.update(id, {
       loginAttempts: 0,
-      lockedUntil: undefined,
+      lockedUntil: null,
     });
   }
 
   async lockAccount(id: string, until: Date): Promise<void> {
     await this.repository.update(id, { lockedUntil: until });
+  }
+
+  /**
+   * Set a new password hash and atomically invalidate everything tied to the
+   * old one (#1108):
+   *
+   * - `refreshToken` / `refreshTokenExpires`: the legacy refresh token can no
+   *   longer mint new access tokens.
+   * - `passwordResetToken` / `passwordResetTokenHash` / `passwordResetExpires`:
+   *   a reset link issued for the old password becomes useless.
+   * - `loginAttempts` / `lockedUntil`: the failed-login lockout state is reset.
+   * - `tokenVersion + 1`: every outstanding access token and session refresh
+   *   is rejected from here on (the `ver` claim is checked by JwtAuthGuard and
+   *   by AuthService.refreshTokens, so auth_sessions rows are dead too).
+   *
+   * A single UPDATE so a partial write can never leave a usable session
+   * behind. Values are `null`, never `undefined` — TypeORM skips undefined
+   * keys in update payloads (see REFACTORING_REPORT.md).
+   */
+  async setPasswordAndInvalidateSessions(
+    id: string,
+    hashedPassword: string,
+  ): Promise<void> {
+    await this.repository
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        password: hashedPassword,
+        refreshToken: null,
+        refreshTokenExpires: null,
+        passwordResetToken: null,
+        passwordResetTokenHash: null,
+        passwordResetExpires: null,
+        loginAttempts: 0,
+        lockedUntil: null,
+        tokenVersion: () => '"tokenVersion" + 1',
+      })
+      .where('id = :id', { id })
+      .execute();
   }
 
   async updateLastLogin(id: string): Promise<void> {

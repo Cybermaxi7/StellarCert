@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -29,6 +30,7 @@ describe('CertificateController', () => {
   };
   const statsService = {
     getPublicSummary: jest.fn(),
+    getStatistics: jest.fn(),
   };
   const certificateMapper = {
     toResponse: jest.fn(),
@@ -92,6 +94,66 @@ describe('CertificateController', () => {
     expect(controller).toBeDefined();
   });
 
+  describe('statistics scoping (#1106)', () => {
+    beforeEach(() => {
+      statsService.getStatistics.mockReset();
+      statsService.getStatistics.mockResolvedValue({
+        verificationStats: { dailyVerifications: 7 },
+      });
+    });
+
+    it("forces an ISSUER's stats to their own issuer id, ignoring a passed issuerId", async () => {
+      const result = await controller.getStatistics(
+        { issuerId: 'someone-elses-issuer-id' },
+        'issuer-own-id',
+        UserRole.ISSUER,
+      );
+
+      expect(statsService.getStatistics).toHaveBeenCalledWith({
+        issuerId: 'issuer-own-id',
+      });
+      expect(result).toEqual({
+        verificationStats: { dailyVerifications: 7 },
+      });
+    });
+
+    it('lets an ADMIN query any issuer (cross-issuer stats)', async () => {
+      await controller.getStatistics(
+        { issuerId: 'other-issuer-id' },
+        'admin-id',
+        UserRole.ADMIN,
+      );
+
+      expect(statsService.getStatistics).toHaveBeenCalledWith({
+        issuerId: 'other-issuer-id',
+      });
+    });
+
+    it('lets an AUDITOR query platform-wide stats', async () => {
+      await controller.getStatistics({}, 'auditor-id', UserRole.AUDITOR);
+
+      expect(statsService.getStatistics).toHaveBeenCalledWith({});
+    });
+
+    it('scopes daily-verification for an ISSUER but not for an ADMIN', async () => {
+      await controller.getDailyVerification('issuer-own-id', UserRole.ISSUER);
+      expect(statsService.getStatistics).toHaveBeenLastCalledWith({
+        issuerId: 'issuer-own-id',
+      });
+
+      await controller.getDailyVerification('admin-id', UserRole.ADMIN);
+      expect(statsService.getStatistics).toHaveBeenLastCalledWith({});
+    });
+
+    it('rejects an ISSUER token without a subject instead of falling back to global stats', async () => {
+      await expect(
+        controller.getStatistics({}, undefined, UserRole.ISSUER),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(statsService.getStatistics).not.toHaveBeenCalled();
+    });
+  });
+
   it('should delegate QR code generation to the service', async () => {
     const response = {
       certificateId: 'cert-123',
@@ -139,7 +201,11 @@ describe('CertificateController', () => {
     certificateService.verifyByCode.mockResolvedValue(mockCertificate);
     certificateMapper.toVerificationResult.mockReturnValue(expectedResponse);
 
-    const req = { ip: '127.0.0.1', socket: { remoteAddress: '127.0.0.1' }, headers: {} };
+    const req = {
+      ip: '127.0.0.1',
+      socket: { remoteAddress: '127.0.0.1' },
+      headers: {},
+    };
     await expect(
       (controller as any).verifyByCode('AB12CD34', req, 'public'),
     ).resolves.toEqual(expectedResponse);
@@ -436,7 +502,11 @@ describe('CertificateController', () => {
     });
 
     it('forwards the issuer identity and role when revoking', async () => {
-      const req = { ip: '127.0.0.1', socket: { remoteAddress: '127.0.0.1' }, headers: {} };
+      const req = {
+        ip: '127.0.0.1',
+        socket: { remoteAddress: '127.0.0.1' },
+        headers: {},
+      };
 
       await controller.revoke(
         CERT_ID,
@@ -494,7 +564,7 @@ describe('CertificateController', () => {
         role: UserRole.RECIPIENT,
       };
 
-      const result = await controller.getMyCertificates(user as any, 2, 5);
+      const result = await controller.getMyCertificates(user, 2, 5);
 
       // Whether the email may be matched is decided in the service, from the
       // database, never from anything the caller can influence.
@@ -574,4 +644,3 @@ describe('CertificateController', () => {
     });
   });
 });
-

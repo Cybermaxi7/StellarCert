@@ -128,8 +128,14 @@ export class CertificateController {
   @ApiOperation({
     summary: 'Advanced certificate search with filters and pagination',
   })
-  async search(@Query() dto: SearchCertificatesDto) {
-    return this.certificateService.search(dto);
+  async search(
+    @Query() dto: SearchCertificatesDto,
+    @CurrentUser('id') currentUserId?: string,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    const effectiveIssuerId =
+      userRole === UserRole.ADMIN ? dto.issuerId : (currentUserId ?? dto.issuerId);
+    return this.certificateService.search({ ...dto, issuerId: effectiveIssuerId });
   }
 
   // ─── Lookup by serial (#1146) ───────────────────────────────────────────────
@@ -288,11 +294,16 @@ export class CertificateController {
     @Param('email') email: string,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
+    @CurrentUser('id') currentUserId?: string,
+    @CurrentUser('role') userRole?: string,
   ) {
+    const effectiveIssuerId =
+      userRole === UserRole.ADMIN ? undefined : currentUserId;
     return this.certificateService.getCertificatesByRecipient(
       email,
       +page,
       +limit,
+      effectiveIssuerId,
     );
   }
 
@@ -304,9 +315,13 @@ export class CertificateController {
     @Param('issuerId', ParseUUIDPipe) issuerId: string,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
+    @CurrentUser('id') currentUserId?: string,
+    @CurrentUser('role') userRole?: string,
   ) {
+    const effectiveIssuerId =
+      userRole === UserRole.ADMIN ? issuerId : (currentUserId ?? issuerId);
     return this.certificateService.getCertificatesByIssuer(
-      issuerId,
+      effectiveIssuerId,
       +page,
       +limit,
     );
@@ -448,8 +463,15 @@ export class CertificateController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.AUDITOR)
   @ApiOperation({ summary: 'Get verification history for a certificate' })
-  async getVerificationHistory(@Param('id', ParseUUIDPipe) id: string) {
-    return this.certificateService.getVerificationHistory(id);
+  async getVerificationHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') currentUserId?: string,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.certificateService.getVerificationHistory(
+      id,
+      userRole === UserRole.ADMIN ? undefined : currentUserId,
+    );
   }
 
   @Get(':id/export')

@@ -72,7 +72,7 @@ export class SearchCertificatesDto {
   })
   @IsOptional()
   @IsDateString()
-  expiresTo?: string;
+  expiresTo: string;
 
   @ApiPropertyOptional({
     description: 'Filter by human-readable certificate ID',

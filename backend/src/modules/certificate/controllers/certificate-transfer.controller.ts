@@ -20,10 +20,10 @@ import {
   RejectTransferDto,
 } from '../dto/transfer-certificate.dto';
 import { JwtAuthGuard } from 'src/common';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { UserRole } from '../../../common/constants/roles';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Certificate Transfers')
 @ApiBearerAuth()
@@ -96,8 +96,11 @@ export class CertificateTransferController {
   @Get('certificate/:certificateId/history')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get transfer history for a certificate' })
-  async getTransferHistory(@Param('certificateId') certificateId: string) {
-    return this.transferService.getTransferHistory(certificateId);
+  async getTransferHistory(
+    @Param('certificateId') certificateId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.transferService.getTransferHistory(certificateId, user);
   }
 
   @Get('pending')

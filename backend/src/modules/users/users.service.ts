@@ -163,12 +163,13 @@ export class UsersService {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
 
-    await this.userRepository.update(user.id, {
-      password: hashedPassword,
-      passwordResetToken: null as any,
-      passwordResetTokenHash: null as any,
-      passwordResetExpires: null as any,
-    });
+    // #1108 — clearing the reset token fields is not enough: revoke refresh
+    // tokens, bump tokenVersion (invalidates outstanding access tokens) and
+    // reset lockout counters in the same UPDATE.
+    await this.userRepository.setPasswordAndInvalidateSessions(
+      user.id,
+      hashedPassword,
+    );
 
     this.logger.log(`Password reset completed for: ${user.email}`);
 

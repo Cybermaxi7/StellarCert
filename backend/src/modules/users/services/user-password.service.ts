@@ -56,7 +56,12 @@ export class UserPasswordService {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
 
-    await this.userRepository.update(userId, { password: hashedPassword });
+    // #1108 — a password change must also kill every session and reset the
+    // lockout state, not just swap the hash.
+    await this.userRepository.setPasswordAndInvalidateSessions(
+      userId,
+      hashedPassword,
+    );
 
     this.logger.log(`Password changed for user: ${user.email}`);
 
@@ -127,12 +132,12 @@ export class UserPasswordService {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
 
-    await this.userRepository.update(user.id, {
-      password: hashedPassword,
-      passwordResetToken: null as any,
-      passwordResetTokenHash: null as any,
-      passwordResetExpires: null as any,
-    });
+    // #1108 — also revoke refresh tokens / bump tokenVersion (killing
+    // outstanding access tokens) and clear any lockout state.
+    await this.userRepository.setPasswordAndInvalidateSessions(
+      user.id,
+      hashedPassword,
+    );
 
     this.logger.log(`Password reset completed for: ${user.email}`);
 

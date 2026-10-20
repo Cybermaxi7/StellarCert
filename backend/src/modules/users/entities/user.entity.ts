@@ -73,14 +73,14 @@ export class User {
   emailVerificationExpires: Date;
 
   @Column({ nullable: true })
-  passwordResetToken: string;
+  passwordResetToken: string | null;
 
   @Column({ nullable: true })
   @Index()
-  passwordResetTokenHash: string;
+  passwordResetTokenHash: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
-  passwordResetExpires: Date;
+  passwordResetExpires: Date | null;
 
   @Column({ default: true })
   isActive: boolean;
@@ -95,7 +95,7 @@ export class User {
   lastLoginAt: Date;
 
   @Column({ type: 'timestamptz', nullable: true })
-  lockedUntil: Date;
+  lockedUntil: Date | null;
 
   @Column({ type: 'varchar', nullable: true })
   refreshToken: string | null;

@@ -112,6 +112,7 @@ describe('UsersService', () => {
     findUsersWithPasswordResetTokens: jest.fn(),
     findByRefreshToken: jest.fn(),
     update: jest.fn(),
+    setPasswordAndInvalidateSessions: jest.fn(),
     delete: jest.fn(),
     softDelete: jest.fn(),
     findAll: jest.fn(),
@@ -459,12 +460,13 @@ describe('UsersService', () => {
       expect(
         mockUserRepository.findByPasswordResetTokenHash,
       ).toHaveBeenCalled();
-      expect(mockUserRepository.update).toHaveBeenCalledWith(mockUser.id, {
-        password: 'hashedPassword123',
-        passwordResetToken: null,
-        passwordResetTokenHash: null,
-        passwordResetExpires: null,
-      });
+      // #1108 — the reset must go through the session-invalidating write
+      // (revokes refresh tokens, bumps tokenVersion, clears lockout), not a
+      // plain password update.
+      expect(
+        mockUserRepository.setPasswordAndInvalidateSessions,
+      ).toHaveBeenCalledWith(mockUser.id, 'hashedPassword123');
+      expect(mockUserRepository.update).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException for invalid token', async () => {
@@ -477,6 +479,9 @@ describe('UsersService', () => {
           confirmPassword: 'NewP@ss456',
         }),
       ).rejects.toThrow('Invalid reset token');
+      expect(
+        mockUserRepository.setPasswordAndInvalidateSessions,
+      ).not.toHaveBeenCalled();
       expect(mockUserRepository.update).not.toHaveBeenCalled();
     });
 
@@ -498,6 +503,9 @@ describe('UsersService', () => {
         }),
       ).rejects.toThrow('Reset token has expired');
       expect(userWithExpiredToken.isPasswordResetTokenValid).toHaveBeenCalled();
+      expect(
+        mockUserRepository.setPasswordAndInvalidateSessions,
+      ).not.toHaveBeenCalled();
       expect(mockUserRepository.update).not.toHaveBeenCalled();
     });
   });

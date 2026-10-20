@@ -16,6 +16,7 @@ import {
   HttpStatus,
   UsePipes,
   ValidationPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { CertificateService } from './certificate.service';
@@ -131,7 +132,6 @@ export class CertificateController {
     return this.certificateService.search(dto);
   }
 
-
   // ─── Lookup by serial (#1146) ───────────────────────────────────────────────
   // MUST be registered before @Get(':id') so "serial" is not parsed as an id.
 
@@ -179,8 +179,13 @@ export class CertificateController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.ISSUER, UserRole.AUDITOR)
   @ApiOperation({ summary: 'Daily verification statistics' })
-  async getDailyVerification(): Promise<{ count: number }> {
-    const stats = await this.statsService.getStatistics({});
+  async getDailyVerification(
+    @CurrentUser('id') currentUserId?: string,
+    @CurrentUser('role') userRole?: string,
+  ): Promise<{ count: number }> {
+    const stats = await this.statsService.getStatistics(
+      this.scopedStatsQuery({}, currentUserId, userRole),
+    );
     return { count: stats.verificationStats?.dailyVerifications ?? 0 };
   }
 
@@ -190,8 +195,35 @@ export class CertificateController {
   @ApiOperation({ summary: 'Detailed certificate statistics' })
   async getStatistics(
     @Query() query: StatsQueryDto,
+    @CurrentUser('id') currentUserId?: string,
+    @CurrentUser('role') userRole?: string,
   ): Promise<CertificateStatsDto> {
-    return this.statsService.getStatistics(query);
+    return this.statsService.getStatistics(
+      this.scopedStatsQuery(query, currentUserId, userRole),
+    );
+  }
+
+  /**
+   * #1106 — an ISSUER's statistics are always scoped to their own issuer id;
+   * any `issuerId` query parameter they pass is ignored. Cross-issuer or
+   * platform-wide statistics are reserved for ADMIN and AUDITOR.
+   */
+  private scopedStatsQuery(
+    query: StatsQueryDto,
+    currentUserId?: string,
+    userRole?: string,
+  ): StatsQueryDto {
+    if (userRole !== UserRole.ISSUER) {
+      return query;
+    }
+    if (!currentUserId) {
+      // Defensive: an ISSUER token without a subject must not fall through to
+      // the unfiltered (platform-wide) query.
+      throw new ForbiddenException(
+        'Cannot resolve issuing account for statistics scope',
+      );
+    }
+    return { ...query, issuerId: currentUserId };
   }
 
   // ─── Verification (public) ───────────────────────────────────────────────────
@@ -310,7 +342,6 @@ export class CertificateController {
   ) {
     return this.certificateService.getUserCertificates(userId, +page, +limit);
   }
-
 
   @Get('export')
   @UseGuards(JwtAuthGuard, RolesGuard)

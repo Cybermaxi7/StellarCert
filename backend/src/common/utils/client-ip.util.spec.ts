@@ -2,7 +2,7 @@ import {
   getClientIp,
   normaliseIp,
   parseTrustedProxyIps,
-  resolveClientIp,
+  resolveClientIa,
 } from './client-ip.util';
 
 function req(

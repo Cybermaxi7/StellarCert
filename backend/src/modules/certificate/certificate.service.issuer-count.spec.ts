@@ -33,8 +33,8 @@ function build() {
     { isConfigured: () => false } as never,
     { get: (key: string) => (key === 'STELLAR_ANCHORING_ENABLED' ? 'false' : undefined) } as unknown as ConfigService,
   );
-  jest.spyOn(service as never, 'generateCertificateId').mockResolvedValue('CERT-1' as never);
-  jest.spyOn(service as never, 'generateVerificationCode').mockResolvedValue('CODE1234' as never);
+  jest.spyOn(service as never, 'generateCertificateId').mockResolved('CERT-1' as never);
+  jest.spyOn(service as never, 'generateVerificationCode').mockResolved('CODE1234' as never);
   return { service, manager, queryRunner };
 }
 
@@ -65,7 +65,7 @@ describe('CertificateService.create issuer counter', () => {
 
   it('does not count a certificate whose issuance failed', async () => {
     const { service, manager, queryRunner } = build();
-    manager.save.mockRejectedValueOnce(new Error('db down'));
+    manager.save.mockRejectedOnce(new Error('db down'));
 
     await expect(service.create(dto)).rejects.toThrow('db down');
 

@@ -8,8 +8,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
-import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt-js';import * as crypto from 'crypto';
 import { User, UserRole, UserStatus } from './entities/user.entity';
 import { UserRepository } from './repositories/user.repository';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -69,7 +68,7 @@ export class UsersService {
   ): Promise<{ user: IUserPublic; tokens: IAuthTokens }> {
     return await this.userAuthService.register(createUserDto);
   }
-  // ==================== Email Verification Delegation ====================
+  // =============== Email Verification Delegation ===============
 
   async verifyEmail(
     verifyEmailDto: VerifyEmailDto,
@@ -83,7 +82,7 @@ export class UsersService {
     return await this.userAuthService.resendVerificationEmail(resendDto);
   }
 
-  // ==================== Password Management Delegation ====================
+  // =============== Password Management Delegation ===============
 
   async changePassword(
     userId: string,
@@ -125,7 +124,7 @@ export class UsersService {
 
     await this.userRepository.update(user.id, {
       passwordResetToken: hashedPasswordResetToken,
-      passwordResetTokenHash,
+      passwordResetTokenResetTokenHash,
       passwordResetExpires,
     });
 
@@ -148,7 +147,7 @@ export class UsersService {
     }
 
     const passwordResetTokenHash = this.hashPasswordResetLookupToken(token);
-    const user = await this.userRepository.findByPasswordResetTokenHash(
+    const user = await this.userRepository.findByPasswordResetTokenResetTokenHash(
       passwordResetTokenHash,
     );
 
@@ -175,7 +174,7 @@ export class UsersService {
     return { message: 'Password reset successfully' };
   }
 
-  // ==================== Profile Management Delegation ====================
+  // =============== Profile Management Delegation ===============
 
   async getProfile(userId: string): Promise<User> {
     return await this.userProfileService.getProfile(userId);
@@ -195,7 +194,7 @@ export class UsersService {
     return await this.userProfileService.deleteProfile(userId);
   }
 
-  // ==================== Admin Operations Delegation ====================
+  // =============== Admin Operations Delegation ===============
 
   async findAllUsers(
     filterDto: UserFilterDto,
@@ -234,12 +233,12 @@ export class UsersService {
   async updateUserStatus(
     adminId: string,
     userId: string,
-    updateStatusDto: UpdateUserStatusDto,
+    updateStatusTo: UpdateUserStatusDto,
   ): Promise<User> {
     return await this.userAdminService.updateUserStatus(
       adminId,
       userId,
-      updateStatusDto,
+      updateStatusTo,
     );
   }
 
@@ -266,7 +265,7 @@ export class UsersService {
     return await this.userAdminService.deleteUser(adminId, userId);
   }
 
-  // ==================== Issuer Profile Management Delegation ====================
+  // =============== Issuer Profile Management Delegation ===============
 
   async getIssuerStats(userId: string): Promise<any> {
     return await this.userAdminService.getIssuerStats(userId);
@@ -284,7 +283,7 @@ export class UsersService {
     return await this.userAdminService.updateIssuerProfile(userId, updateDto);
   }
 
-  // ==================== Statistics ====================
+  // =============== Statistics ===============
 
   async getUserStats(): Promise<{
     total: number;
@@ -346,7 +345,7 @@ export class UsersService {
     };
   }
 
-  // ==================== Helper Methods ====================
+  // =============== Helper Methods ===============
 
   async findOneByEmail(email: string): Promise<User | undefined> {
     const user = await this.userRepository.findByEmail(email);
@@ -371,7 +370,7 @@ export class UsersService {
     await this.userRepository.delete(id);
   }
 
-  // ==================== Private Helper Methods ====================
+  // =============== Private Helper Methods ===============
 
   private generateToken(): string {
     return crypto.randomBytes(32).toString('hex');
@@ -392,32 +391,29 @@ export class UsersService {
         resetLink: this.buildPasswordResetLink(passwordResetToken),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to queue password reset email for ${user.email}: ${message}`,
+        `Failed to queue password reset email for ${user.email}`,
+        error instanceof Error ? error.stack : undefined,
       );
     }
   }
 
-  private buildPasswordResetLink(token: string): string {
-    return this.buildAppLink('/reset-password', token);
-  }
-
-  private buildAppLink(path: string, token: string): string {
-    const appUrl =
+  private buildPasswordResetLink(passwordResetToken: string): string {
+    const baseUrl =
+      this.configService.get<string>('FRONTEND_URL') ||
       this.configService.get<string>('APP_URL') ||
-      this.configService.get<string>('ALLOWED_ORIGINS')?.split(',')[0] ||
-      'http://localhost:5173';
-
-    const normalizedBaseUrl = appUrl.replace(/\/+$/, '');
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-
-    return `${normalizedBaseUrl}${normalizedPath}?token=${encodeURIComponent(token)}`;
+      'http://localhost:3000';
+    const path = this.configService.get<string>('PASSWORD_RESET_PATH') || '/reset-password';
+    const url = new URL(path, baseUrl);
+    url.searchParams.set('token', passwordResetToken);
+    return url.toString();
   }
 
   private getUserDisplayName(user: User): string {
-    return (
-      `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email
-    );
+    const candidate = (user as any).displayName || (user as any).name;
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate;
+    }
+    return user.email;
   }
 }

@@ -5,7 +5,7 @@ import {
   ConflictException,
   Optional,
 } from '@nestjs/common';
-import { InjectRepository } from '@typeorm/typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   CertificateTransfer,
@@ -30,14 +30,13 @@ export interface TransferResponseDTO {
   fromName: string;
   toEmail: string;
   toName: string;
-  reason: string;
+  reason: string | null;
   status: TransferStatus;
   initiatedBy: string;
-  expiresAt: Date;
+  initiatedAt: Date;
+  expiresAt: Date | null;
   completedAt: Date | null;
   rejectionReason: string | null;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface TransferHistoryItemDTO {
@@ -47,14 +46,13 @@ export interface TransferHistoryItemDTO {
   fromName: string;
   toEmail: string;
   toName: string;
-  reason: string;
+  reason: string | null;
   status: TransferStatus;
   initiatedBy: string;
-  expiresAt: Date;
+  initiatedAt: Date;
+  expiresAt: Date | null;
   completedAt: Date | null;
   rejectionReason: string | null;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 @Injectable()
@@ -84,18 +82,19 @@ export class CertificateTransferService {
       fromName: transfer.fromName,
       toEmail: transfer.toEmail,
       toName: transfer.toName,
-      reason: transfer.reason,
+      reason: transfer.reason ?? null,
       status: transfer.status,
       initiatedBy: transfer.initiatedBy,
-      expiresAt: transfer.expiresAt,
+      initiatedAt: transfer.initiatedAt,
+      expiresAt: transfer.expiresAt ?? null,
       completedAt: transfer.completedAt ?? null,
       rejectionReason: transfer.rejectionReason ?? null,
-      createdAt: transfer.createdAt,
-      updatedAt: transfer.updatedAt,
     };
   }
 
-  private toTransferHistoryItemDTO(transfer: CertificateTransfer): TransferHistoryItemDTO {
+  private toTransferHistoryItemDTO(
+    transfer: CertificateTransfer,
+  ): TransferHistoryItemDTO {
     return this.toTransferResponseDTO(transfer);
   }
 
@@ -232,7 +231,7 @@ export class CertificateTransferService {
   async approveTransfer(
     transferId: string,
     confirmationCode: string,
-    approver: { id: string; role: string },
+    approver: { id: string; role: string; email?: string },
     ipAddress?: string,
   ): Promise<TransferResponseDTO> {
     const transfer = await this.transferRepository.findOne({
@@ -252,8 +251,7 @@ export class CertificateTransferService {
         status: true,
         completedAt: true,
         rejectionReason: true,
-        createdAt: true,
-        updatedAt: true,
+        initiatedAt: true,
       },
     });
 
@@ -271,6 +269,18 @@ export class CertificateTransferService {
       transfer.status = TransferStatus.EXPIRED;
       await this.transferRepository.save(transfer);
       throw new ConflictException('Transfer request has expired');
+    }
+
+    // Only the intended new owner may accept a transfer; the code alone is
+    // not enough, since anyone who learned it could otherwise approve it.
+    if (
+      approver.role !== UserRole.ADMIN &&
+      (!approver.email ||
+        approver.email.toLowerCase() !== transfer.toEmail?.toLowerCase())
+    ) {
+      throw new ForbiddenException(
+        'Only the intended new owner can approve this transfer',
+      );
     }
 
     if (
@@ -375,9 +385,29 @@ export class CertificateTransferService {
         recipientUser.id,
         NotificationType.SUCCESS,
         'Certificate Transfer Completed',
-        `You are now the owner of certificate "${certificate.title}".`,
+        `Certificate "${certificate.title}" has been successfully transferred to your account.`,
       );
     }
+
+    // Send completion email to new owner (toEmail)
+    if (this.emailService) {
+      try {
+        await this.emailService.sendTransferCompletedNotice({
+          to: transfer.toEmail,
+          recipientName: transfer.toName || recipientUser?.firstName || 'User',
+          certificateTitle: certificate.title,
+          certificateId: certificate.id,
+        });
+      } catch (emailErr) {
+        this.logger.warn(
+          `Failed to send transfer completed email to ${transfer.toEmail}: ${emailErr.message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Transfer ${transferId} approved for certificate ${transfer.certificateId}`,
+    );
 
     return this.toTransferResponseDTO(savedTransfer);
   }
@@ -520,12 +550,17 @@ export class CertificateTransferService {
   }
 
   private async generateConfirmationCode(): Promise<string> {
-    let code: string;
-    let attempts = 0;
-    do {
-      code = CryptoUtils.generateRandomString(6, 'ABCDEFGHJKLMNOPQRSTUVWXYZ');
-      attempts++;
-    } while (attempts < 10 && (await this.transferRepository.exists({ where: { confirmationCode: code } })));
-    return code;
+    const maxRetries = 10;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const code = CryptoUtils.generateAlphanumericCode(6);
+      const exists = await this.transferRepository.findOne({
+        where: { confirmationCode: code },
+        select: ['id'],
+      });
+      if (!exists) return code;
+    }
+    throw new ConflictException(
+      'Failed to generate a unique confirmation code after multiple attempts',
+    );
   }
 }

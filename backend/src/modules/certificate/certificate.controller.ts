@@ -133,9 +133,9 @@ export class CertificateController {
     @CurrentUser('id') currentUserId?: string,
     @CurrentUser('role') userRole?: string,
   ) {
-    const effectiveIssuerId =
-      userRole === UserRole.ADMIN ? dto.issuerId : (currentUserId ?? dto.issuerId);
-    return this.certificateService.search({ ...dto, issuerId: effectiveIssuerId });
+    // The service scopes non-admins to their own certificates; an issuerId
+    // filter in the query is honoured for admins only.
+    return this.certificateService.search(dto, currentUserId, userRole);
   }
 
   // ─── Lookup by serial (#1146) ───────────────────────────────────────────────
@@ -470,7 +470,8 @@ export class CertificateController {
   ) {
     return this.certificateService.getVerificationHistory(
       id,
-      userRole === UserRole.ADMIN ? undefined : currentUserId,
+      currentUserId,
+      userRole,
     );
   }
 

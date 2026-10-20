@@ -93,8 +93,13 @@ describe('CertificateTransferService', () => {
       );
 
       expect(result).toBeDefined();
-      const code = result.confirmationCode!;
-      expect(code).toBeDefined();
+      // The secret code goes to the new owner by email and must never appear in
+      // the API response returned to the initiator.
+      const code = (emailService.sendTransferConfirmationCode as jest.Mock).mock
+        .calls[0][0].confirmationCode as string;
+      expect(code).toEqual(expect.any(String));
+      expect(JSON.stringify(result)).not.toContain(code);
+      expect(result).not.toHaveProperty('confirmationCode');
 
       // 1. Initiator notification must NOT contain confirmationCode
       expect(notificationsService.createNotification).toHaveBeenCalledWith(
@@ -124,6 +129,52 @@ describe('CertificateTransferService', () => {
   });
 
   describe('approveTransfer', () => {
+    const pendingTransfer = () => ({
+      id: 'transfer-2',
+      certificateId: 'cert-1',
+      toEmail: 'NewOwner@Example.com',
+      toName: 'New Owner',
+      confirmationCode: 'ABC123',
+      status: TransferStatus.PENDING,
+      certificate: {
+        id: 'cert-1',
+        title: 'Cert',
+        issuerId: 'issuer-1',
+        status: 'active',
+        metadata: {},
+      },
+    });
+
+    it('rejects an approver who is not the intended new owner, even with the right code', async () => {
+      transferRepo.findOne.mockResolvedValue(pendingTransfer());
+
+      await expect(
+        service.approveTransfer(
+          'transfer-2',
+          'ABC123',
+          { id: 'stranger', role: UserRole.USER, email: 'someone@else.com' },
+          '127.0.0.1',
+        ),
+      ).rejects.toThrow(
+        'Only the intended new owner can approve this transfer',
+      );
+    });
+
+    it('lets the intended new owner approve (email compared case-insensitively)', async () => {
+      const transfer = pendingTransfer();
+      transferRepo.findOne.mockResolvedValue(transfer);
+      certRepo.findOne.mockResolvedValue(transfer.certificate);
+
+      await expect(
+        service.approveTransfer(
+          'transfer-2',
+          'ABC123',
+          { id: 'owner', role: UserRole.USER, email: 'newowner@example.com' },
+          '127.0.0.1',
+        ),
+      ).resolves.toBeDefined();
+    });
+
     it('notifies both approver and recipient (toEmail) on completion', async () => {
       const mockTransfer = {
         id: 'transfer-1',

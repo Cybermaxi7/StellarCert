@@ -20,10 +20,10 @@ import {
   RejectTransferDto,
 } from '../dto/transfer-certificate.dto';
 import { JwtAuthGuard } from 'src/common';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { UserRole } from '../../../common/constants/roles';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 
 @ApiTags('Certificate Transfers')
 @ApiBearerAuth()

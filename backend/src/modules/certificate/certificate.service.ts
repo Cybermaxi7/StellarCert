@@ -400,7 +400,6 @@ export class CertificateService {
     return certificate;
   }
 
-
   /**
    * Lookup by serial number scoped to the caller's own certificates (#1146).
    * Admins may look up any serial.
@@ -1014,9 +1013,11 @@ export class CertificateService {
           issuerId: (dto as any).issuerId,
         });
       }
-    } else if (currentUserId) {
+    } else {
+      // Fail closed: a non-admin caller is always scoped to their own
+      // certificates; a missing id matches nothing rather than everything.
       queryBuilder.andWhere('certificate.issuerId = :issuerId', {
-        issuerId: currentUserId,
+        issuerId: currentUserId ?? null,
       });
     }
 
@@ -1099,7 +1100,10 @@ export class CertificateService {
     limit = 10,
   ): Promise<Certificate[]> {
     const safePage = Math.max(1, Number(page) || 1);
-    const safeLimit = Math.min(Math.max(1, Number(limit) || 10), MAX_PAGE_LIMIT);
+    const safeLimit = Math.min(
+      Math.max(1, Number(limit) || 10),
+      MAX_PAGE_LIMIT,
+    );
 
     const user = await this.userRepository.findOne({
       where: { id: recipientId },
@@ -1127,7 +1131,6 @@ export class CertificateService {
       .take(safeLimit)
       .getMany();
   }
-
 
   async getCertificateQrCode(id: string): Promise<any> {
     const certificate = await this.findOne(id);
@@ -1158,7 +1161,11 @@ export class CertificateService {
     userRole?: string,
   ): Promise<Verification[]> {
     const certificate = await this.findOne(id);
-    if (userRole !== UserRole.ADMIN && certificate.issuerId !== currentUserId) {
+    // Admins and auditors may read any certificate's history; an issuer only
+    // their own. Not-found rather than forbidden, so ids cannot be probed.
+    const canReadAll =
+      userRole === UserRole.ADMIN || userRole === UserRole.AUDITOR;
+    if (!canReadAll && certificate.issuerId !== currentUserId) {
       throw new NotFoundException(`Certificate with ID ${id} not found`);
     }
 

@@ -38,7 +38,7 @@ describe('CertificateService', () => {
     save: jest.fn(),
     createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
-  const verificationRepository = {};
+  const verificationRepository = { find: jest.fn().mockResolvedValue([]) };
   const duplicateDetectionService = {};
   const webhooksService = {
     triggerEvent: jest.fn(),
@@ -543,7 +543,11 @@ describe('CertificateService', () => {
         isEmailVerified: true,
       });
       mockQueryBuilder.getMany.mockResolvedValueOnce([
-        { id: 'cert-1', recipientId: null, recipientEmail: 'alice@example.com' },
+        {
+          id: 'cert-1',
+          recipientId: null,
+          recipientEmail: 'alice@example.com',
+        },
       ]);
 
       const result = await service.findForRecipient('user-1', 1, 10);
@@ -587,4 +591,3 @@ describe('CertificateService', () => {
     });
   });
 });
-

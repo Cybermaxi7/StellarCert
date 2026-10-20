@@ -241,7 +241,7 @@ export class CertificateRepository {
     const rows = await this.repo
       .createQueryBuilder('cert')
       .select('cert.status', 'status')
-      .addSelect('COUNT(*', 'count')
+      .addSelect('COUNT(*)', 'count')
       .groupBy('cert.status')
       .getRawMany<{ status: CertificateStatus; count: string }>();
 

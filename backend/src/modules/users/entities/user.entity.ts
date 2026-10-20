@@ -72,10 +72,12 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   emailVerificationExpires: Date;
 
-  @Column({ nullable: true })
+  // Explicit type: a `string | null` union is emitted as Object, which TypeORM
+  // rejects at startup ("Data type Object is not supported").
+  @Column({ type: 'varchar', nullable: true })
   passwordResetToken: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   @Index()
   passwordResetTokenHash: string | null;
 

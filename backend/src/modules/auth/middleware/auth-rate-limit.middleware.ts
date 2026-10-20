@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from 'express';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
+import { rateLimitsDisabledForTests } from '../../../common/rate-limiting/rate-limit-test-switch';
 
 interface RateLimitData {
   count: number;
@@ -46,6 +47,11 @@ export class AuthRateLimitMiddleware implements NestMiddleware {
   }
 
   async use(req: Request, res: Response, next: NextFunction): Promise<void> {
+    if (rateLimitsDisabledForTests()) {
+      next();
+      return;
+    }
+
     const ip = this.getClientIp(req);
     const key = `rate:auth:${String(ip)}`;
 

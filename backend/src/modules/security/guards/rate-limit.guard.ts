@@ -23,6 +23,7 @@ import {
   resolveClientIp,
 } from '../../../common/utils/client-ip.util';
 import { LoggingService } from '../../../common/logging/logging.service';
+import { rateLimitsDisabledForTests } from '../../../common/rate-limiting/rate-limit-test-switch';
 import {
   RATE_LIMIT_OPTIONS_KEY,
   RateLimitOptions,
@@ -79,6 +80,8 @@ export class RateLimitGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (rateLimitsDisabledForTests()) return true;
+
     const http = context.switchToHttp();
     const request = http.getRequest<RequestWithContext>();
     const response = http.getResponse<Response>();

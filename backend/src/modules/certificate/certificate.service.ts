@@ -913,13 +913,23 @@ export class CertificateService {
     email: string,
     page = 1,
     limit = 10,
+    currentUserId?: string,
+    userRole?: string,
   ): Promise<Certificate[]> {
-    return this.certificateRepository
+    const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
       .leftJoin('certificate.issuer', 'issuer')
       .addSelect(PUBLIC_ISSUER_COLUMNS)
       .where('certificate.recipientEmail = :email', { email })
-      .orderBy('certificate.issuedAt', 'DESC')
+      .orderBy('certificate.issuedAt', 'DESC');
+
+    if (userRole !== UserRole.ADMIN) {
+      queryBuilder.andWhere('certificate.issuerId = :issuerId', {
+        issuerId: currentUserId,
+      });
+    }
+
+    return queryBuilder
       .skip((page - 1) * limit)
       .take(limit)
       .getMany();
@@ -929,12 +939,19 @@ export class CertificateService {
     issuerId: string,
     page = 1,
     limit = 10,
+    currentUserId?: string,
+    userRole?: string,
   ): Promise<Certificate[]> {
+    const effectiveIssuerId =
+      userRole === UserRole.ADMIN ? issuerId : currentUserId;
+
     return this.certificateRepository
       .createQueryBuilder('certificate')
       .leftJoin('certificate.issuer', 'issuer')
       .addSelect(PUBLIC_ISSUER_COLUMNS)
-      .where('certificate.issuerId = :issuerId', { issuerId })
+      .where('certificate.issuerId = :issuerId', {
+        issuerId: effectiveIssuerId,
+      })
       .orderBy('certificate.issuedAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
@@ -952,7 +969,11 @@ export class CertificateService {
   }
 
   // Additional methods from main branch
-  async search(dto: SearchCertificatesDto): Promise<any> {
+  async search(
+    dto: SearchCertificatesDto,
+    currentUserId?: string,
+    userRole?: string,
+  ): Promise<any> {
     const queryBuilder = this.certificateRepository
       .createQueryBuilder('certificate')
       .leftJoin('certificate.issuer', 'issuer')
@@ -987,9 +1008,15 @@ export class CertificateService {
       });
     }
 
-    if ((dto as any).issuerId) {
+    if (userRole === UserRole.ADMIN) {
+      if ((dto as any).issuerId) {
+        queryBuilder.andWhere('certificate.issuerId = :issuerId', {
+          issuerId: (dto as any).issuerId,
+        });
+      }
+    } else if (currentUserId) {
       queryBuilder.andWhere('certificate.issuerId = :issuerId', {
-        issuerId: (dto as any).issuerId,
+        issuerId: currentUserId,
       });
     }
 
@@ -1125,7 +1152,16 @@ export class CertificateService {
     };
   }
 
-  async getVerificationHistory(id: string): Promise<Verification[]> {
+  async getVerificationHistory(
+    id: string,
+    currentUserId?: string,
+    userRole?: string,
+  ): Promise<Verification[]> {
+    const certificate = await this.findOne(id);
+    if (userRole !== UserRole.ADMIN && certificate.issuerId !== currentUserId) {
+      throw new NotFoundException(`Certificate with ID ${id} not found`);
+    }
+
     return this.verificationRepository.find({
       where: { certificate: { id } as any },
       order: { verifiedAt: 'DESC' },

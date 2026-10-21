@@ -54,6 +54,37 @@ export class CertificateService {
     private readonly configService: ConfigService,
   ) {}
 
+  /**
+   * #1247 — reject an expiry date that is not in the future (and, when the
+   * issue date is known, not after it). A certificate stored with a past
+   * `expiresAt` is created as `active`, immediately verifies as `expired`,
+   * and is counted as active in issuer statistics until the expiration job
+   * runs — so the check lives in the service as well as the DTO, because
+   * `create()` is also called internally (batch issuance, duplicate
+   * overrides) without the validation pipe.
+   */
+  private assertExpiryIsValid(
+    expiresAt: Date | string | undefined,
+    issueDate?: Date,
+  ): void {
+    if (!expiresAt) {
+      return;
+    }
+    const expiry =
+      expiresAt instanceof Date ? expiresAt : new Date(String(expiresAt));
+    if (Number.isNaN(expiry.getTime())) {
+      throw new BadRequestException('expiresAt must be a valid date');
+    }
+    const reference = issueDate ?? new Date();
+    if (expiry.getTime() <= reference.getTime()) {
+      throw new BadRequestException(
+        issueDate
+          ? 'expiresAt must be after the issue date'
+          : 'expiresAt must be a date in the future',
+      );
+    }
+  }
+
   async create(
     dto: CreateCertificateDto,
     duplicateConfig?: DuplicateDetectionConfig,
@@ -61,6 +92,8 @@ export class CertificateService {
     ipAddress = 'unknown',
     userAgent = 'unknown',
   ): Promise<Certificate> {
+    this.assertExpiryIsValid(dto.expiresAt);
+
     // Look up recipientId from email if not provided
     let recipientId = dto.recipientId;
     if (!recipientId && dto.recipientEmail) {
@@ -427,6 +460,30 @@ export class CertificateService {
     return certificate;
   }
 
+  /**
+   * Public lookup by the human-readable serial (`certificateId`, e.g.
+   * CERT-2026-AB12CD34) — the identifier the shareable /c/:publicId page and
+   * the embeddable badge are keyed by (#1178). Unlike the UUID `:id` route,
+   * this identifier is safe to publish: it grants no write capability and
+   * the projection built from it omits email and verification code.
+   */
+  async findByPublicId(publicId: string): Promise<Certificate> {
+    const certificate = await this.certificateRepository
+      .createQueryBuilder('certificate')
+      .leftJoin('certificate.issuer', 'issuer')
+      .addSelect(PUBLIC_ISSUER_COLUMNS)
+      .where('certificate.certificateId = :publicId', { publicId })
+      .getOne();
+
+    if (!certificate) {
+      throw new NotFoundException(
+        `Certificate with public ID ${publicId} not found`,
+      );
+    }
+
+    return certificate;
+  }
+
   async findByVerificationCode(verificationCode: string): Promise<Certificate> {
     const certificate = await this.certificateRepository
       .createQueryBuilder('certificate')
@@ -489,6 +546,12 @@ export class CertificateService {
     updateCertificateDto: UpdateCertificateDto,
   ): Promise<Certificate> {
     const certificate = await this.findOne(id);
+
+    // #1247 — an update must not shorten expiry below the issue date either.
+    this.assertExpiryIsValid(
+      updateCertificateDto.expiresAt,
+      certificate.issuedAt,
+    );
 
     Object.assign(certificate, updateCertificateDto);
 
@@ -1238,6 +1301,11 @@ export class CertificateService {
   ): Promise<Certificate> {
     const certificate = await this.findOne(id);
     this.assertCertificateOwnership(certificate, userId, userRole);
+    // #1247 — same expiry rule as `update`: never before the issue date.
+    this.assertExpiryIsValid(
+      updateCertificateDto.expiresAt,
+      certificate.issuedAt,
+    );
     Object.assign(certificate, updateCertificateDto);
     return this.certificateRepository.save(certificate);
   }

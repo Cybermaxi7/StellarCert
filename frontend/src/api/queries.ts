@@ -31,6 +31,7 @@ import {
   revokeCertificate,
   templateApi,
   userApi,
+  publicCertificateApi,
 } from "./endpoints";
 
 /**
@@ -61,6 +62,8 @@ export const queryKeys = {
     user: (userId: string) => ["certificates", "user", userId] as const,
     verification: (serialNumber: string) =>
       ["certificates", "verify", serialNumber] as const,
+    publicView: (publicId: string) =>
+      ["certificates", "public", publicId] as const,
     history: (certificateId: string) =>
       ["certificates", "history", certificateId] as const,
   },
@@ -166,6 +169,18 @@ export const useVerifyCertificateQuery = (serialNumber: string) =>
     queryKey: queryKeys.certificates.verification(serialNumber),
     queryFn: () => certificateApi.verify(serialNumber),
     enabled: serialNumber.trim().length > 0,
+  });
+
+/**
+ * Public share-page lookup (#1178). Anonymous fetch keyed by the publishable
+ * serial; cacheable since the projection is the same for every viewer.
+ */
+export const usePublicCertificateQuery = (publicId: string) =>
+  useQuery({
+    queryKey: queryKeys.certificates.publicView(publicId),
+    queryFn: () => publicCertificateApi.getByPublicId(publicId),
+    enabled: publicId.trim().length > 0,
+    staleTime: 60_000,
   });
 
 // ── Templates ──────────────────────────────────────────────────────────────

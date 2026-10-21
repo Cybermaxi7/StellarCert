@@ -30,6 +30,7 @@ import {
   ForgotPasswordRequest,
   ResetPasswordRequest,
   VerifyEmailRequest,
+  PublicCertificate,
 } from "./types";
 import { tokenStorage, notifyTokenRefreshed } from "./tokens";
 
@@ -637,6 +638,24 @@ export const getCertificateQR = async (
   } catch (error) {
     return handleError(error, "getCertificateQR");
   }
+};
+
+/**
+ * Public certificate projection + embeddable badge (#1178). Anonymous by
+ * design: keyed by the publishable serial, never sends credentials.
+ */
+export const publicCertificateApi = {
+  getByPublicId: (publicId: string): Promise<PublicCertificate> =>
+    apiClient<PublicCertificate>(
+      `/certificates/public/${encodeURIComponent(publicId)}`,
+      { skipAuth: true },
+    ),
+  /** Direct URL of the SVG badge, for <img src> and markdown embeds. */
+  badgeUrl: (publicId: string): string =>
+    `${API_URL}/certificates/public/${encodeURIComponent(publicId)}/badge`,
+  /** iframe-ready HTML page wrapping the badge. */
+  embedUrl: (publicId: string): string =>
+    `${API_URL}/certificates/public/${encodeURIComponent(publicId)}/embed`,
 };
 
 export const certificateApi = {

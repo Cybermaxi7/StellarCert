@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { IsFutureDate } from '../../../common/validators/is-future-date.validator';
 
 export class IssueCertificateDto {
   @ApiPropertyOptional({
@@ -70,10 +71,12 @@ export class IssueCertificateDto {
   verificationCode?: string;
 
   @ApiPropertyOptional({
-    description: 'Certificate expiration date (ISO 8601)',
+    description:
+      'Certificate expiration date (ISO 8601, must be in the future)',
   })
   @IsOptional()
   @IsDateString()
+  @IsFutureDate()
   expiresAt?: string;
 
   @ApiPropertyOptional({

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CertificateService } from './certificate.service';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -588,6 +588,65 @@ describe('CertificateService', () => {
       await service.findForRecipient('user-3', 1, 100000);
 
       expect(mockQueryBuilder.take).not.toHaveBeenCalledWith(100000);
+    });
+  });
+
+  describe('expiry validation (#1247)', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('rejects create() with an expiresAt in the past before touching the database', async () => {
+      await expect(
+        service.create({
+          expiresAt: new Date('2000-01-01T00:00:00.000Z'),
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(userRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('rejects update() that shortens expiry below the issue date', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({
+        id: 'cert-1',
+        issuedAt: new Date('2026-01-01T00:00:00.000Z'),
+      } as Certificate);
+
+      await expect(
+        service.update('cert-1', {
+          expiresAt: new Date('2025-01-01T00:00:00.000Z'),
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(certificateRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('allows update() with an expiresAt after the issue date', async () => {
+      const certificate = {
+        id: 'cert-1',
+        issuedAt: new Date('2026-01-01T00:00:00.000Z'),
+      } as Certificate;
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(certificate);
+      certificateRepository.save.mockResolvedValueOnce(certificate);
+
+      await expect(
+        service.update('cert-1', {
+          expiresAt: new Date('2027-01-01T00:00:00.000Z'),
+        } as any),
+      ).resolves.toBeDefined();
+    });
+
+    it('allows update() with no expiresAt change', async () => {
+      const certificate = {
+        id: 'cert-1',
+        issuedAt: new Date('2026-01-01T00:00:00.000Z'),
+      } as Certificate;
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce(certificate);
+      certificateRepository.save.mockResolvedValueOnce(certificate);
+
+      await expect(
+        service.update('cert-1', { title: 'Updated title' } as any),
+      ).resolves.toBeDefined();
     });
   });
 });

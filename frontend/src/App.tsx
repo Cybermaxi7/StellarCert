@@ -14,6 +14,7 @@ import { WALLET_ALLOWED_ROLES } from "./constants/routeAccess";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const IssueCertificate = lazy(() => import("./pages/IssueCertificate"));
 const VerifyCertificate = lazy(() => import("./pages/VerifyCertificate"));
+const CertificatePublic = lazy(() => import("./pages/CertificatePublic"));
 const CertificateWallet = lazy(() => import("./pages/CertificateWallet"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
@@ -65,6 +66,8 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/verify" element={<VerifyCertificate />} />
+                  {/* Public share page (#1178): anonymous, no guard. */}
+                  <Route path="/c/:publicId" element={<CertificatePublic />} />
                   <Route path="/verify-email" element={<VerifyEmail />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
 

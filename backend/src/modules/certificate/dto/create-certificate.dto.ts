@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsFutureDate } from '../../../common/validators/is-future-date.validator';
 
 export class CreateCertificateDto {
   @ApiPropertyOptional({
@@ -70,6 +71,7 @@ export class CreateCertificateDto {
   })
   @IsOptional()
   @Type(() => Date)
+  @IsFutureDate()
   expiresAt?: Date;
 
   @ApiPropertyOptional({

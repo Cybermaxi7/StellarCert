@@ -19,6 +19,7 @@ import { CertificateTemplateService } from './services/template.service';
 import { CertificateTransferService } from './services/certificate-transfer.service';
 
 import { CertificateController } from './certificate.controller';
+import { PublicCertificatesController } from './controllers/public-certificates.controller';
 import { DuplicateDetectionController } from './controllers/duplicate-detection.controller';
 import { TemplatesController } from './controllers/templates.controller';
 import { CertificateTransferController } from './controllers/certificate-transfer.controller';
@@ -60,6 +61,7 @@ import { CertificateExpirationJob } from './jobs/certificate-expiration.job';
   ],
   controllers: [
     CertificateController,
+    PublicCertificatesController,
     DuplicateDetectionController,
     TemplatesController,
     CertificateTransferController,

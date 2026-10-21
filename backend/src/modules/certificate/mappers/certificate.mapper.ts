@@ -55,6 +55,32 @@ export interface CertificateSummaryDto {
   hasStellarRecord: boolean;
 }
 
+/**
+ * Public projection of a certificate (#1178): everything a stranger needs to
+ * verify a credential, and nothing that identifies the recipient privately.
+ * `recipientEmail` and `verificationCode` are deliberately absent — the code
+ * is the credential-equivalent secret for verification-by-code lookups, and
+ * the email is PII with no verification value.
+ */
+export interface PublicCertificateDto {
+  publicId: string;
+  title: string;
+  courseName?: string;
+  description?: string;
+  recipientName: string;
+  issuerName?: string;
+  issuerStellarAddress?: string;
+  status: 'valid' | 'revoked' | 'expired' | 'frozen';
+  issuedAt: Date;
+  expiresAt?: Date;
+  verificationCount: number;
+  chainProof: {
+    anchored: boolean;
+    transactionHash?: string;
+    explorerUrl?: string;
+  };
+}
+
 @Injectable()
 export class CertificateMapper {
   toResponse(certificate: Certificate): CertificateResponseDto {
@@ -149,6 +175,62 @@ export class CertificateMapper {
               ? 'Certificate is temporarily frozen'
               : 'Certificate has expired',
       verificationId: `ver_${Date.now()}`,
+    };
+  }
+
+  /**
+   * #1178 — public share-page projection with the chain-proof panel data.
+   * The Stellar Expert link is built here so the frontend never has to know
+   * which network the issuer anchors on.
+   */
+  toPublicProjection(
+    certificate: Certificate,
+    network: 'public' | 'testnet' = 'public',
+  ): PublicCertificateDto {
+    const issuerName =
+      certificate.issuerName ??
+      (certificate.issuer
+        ? `${certificate.issuer.firstName ?? ''} ${certificate.issuer.lastName ?? ''}`.trim()
+        : undefined);
+
+    const isExpired = certificate.expiresAt
+      ? new Date() > new Date(certificate.expiresAt)
+      : false;
+    const isFrozen = certificate.status === 'frozen';
+    const isRevoked = certificate.status === 'revoked';
+    const status = isRevoked
+      ? 'revoked'
+      : isFrozen
+        ? 'frozen'
+        : isExpired
+          ? 'expired'
+          : 'valid';
+
+    const txHash = certificate.stellarTransactionHash;
+
+    return {
+      publicId: certificate.certificateId,
+      title: certificate.title,
+      courseName: certificate.courseName,
+      description: certificate.description,
+      recipientName: certificate.recipientName,
+      issuerName,
+      issuerStellarAddress:
+        certificate.issuerStellarAddress ??
+        certificate.issuer?.stellarPublicKey,
+      status,
+      issuedAt: certificate.issuedAt,
+      expiresAt: certificate.expiresAt,
+      verificationCount: certificate.verificationCount ?? 0,
+      chainProof: {
+        anchored: !!txHash,
+        ...(txHash
+          ? {
+              transactionHash: txHash,
+              explorerUrl: `https://stellar.expert/explorer/${network}/tx/${txHash}`,
+            }
+          : {}),
+      },
     };
   }
 

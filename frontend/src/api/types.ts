@@ -120,6 +120,30 @@ export interface CreateCertificateData {
 /**
  * Verification result details
  */
+/**
+ * Privacy-preserving public projection of a certificate (#1178), served for
+ * the shareable /c/:publicId page. Deliberately has no recipientEmail and no
+ * verificationCode.
+ */
+export interface PublicCertificate {
+  publicId: string;
+  title: string;
+  courseName?: string;
+  description?: string;
+  recipientName: string;
+  issuerName?: string;
+  issuerStellarAddress?: string;
+  status: "valid" | "revoked" | "expired" | "frozen";
+  issuedAt: string;
+  expiresAt?: string;
+  verificationCount: number;
+  chainProof: {
+    anchored: boolean;
+    transactionHash?: string;
+    explorerUrl?: string;
+  };
+}
+
 export interface VerificationResult {
   isValid: boolean;
   status?: "valid" | "revoked" | "expired" | "not_found";
